@@ -30,3 +30,6 @@ Ray tracing in not required to propagate an electric field, it works for any NxN
 Common issues with field propagation are: (should include examples)
 1. If the intensity profile is scratchy or has regions of no intensity, this could be a sign of poor sampling, try generating more rays.
 2. If the resulting caustic or phase angle appears spotty and uniform, the propagation grid is not near the focus or the sampling in kspace is wrong.
+
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12752313.svg)](https://doi.org/10.5281/zenodo.12752313)
