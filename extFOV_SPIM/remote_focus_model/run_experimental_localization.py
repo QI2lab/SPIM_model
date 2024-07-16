@@ -17,7 +17,7 @@ import time
 from localize_psf.fit_psf import gaussian3d_psf_model, average_exp_psfs
 from localize_psf.localize import (localize_beads_generic,
                                    get_param_filter,
-                                   boundary_filter,
+                                   filter,
                                    get_coords,
                                    plot_fit_roi,
                                    plot_bead_locations)
@@ -48,9 +48,40 @@ showfig = False
 t_initial = time.time()
 
 #------------------------------------------------------------------------------#
+# create a custom filter for localize_psf
+class boundary_filter(filter):
+    """
+    Filter based on distance to boundary and fit sigma_z
+    """
+    def __init__(self,
+                 coords,
+                 sf = 2):
+        """
+        Define a filter based on the bead position and z-size.
+        """
+        self.condition_names = ["z position and PSF too small",
+                                "z position and PSF too large"]
+        self.coords = coords
+        self.sf = sf
+
+    def filter(self,
+               fit_params: np.ndarray,
+               *args,
+               **kwargs):
+
+        z, y, x = self.coords
+        conditions = np.stack((fit_params[:, 3] >= fit_params[:, 5]*self.sf + z.min(),
+                               fit_params[:, 3] <= z.max() - fit_params[:, 5]*self.sf + z.max()),
+                              axis=1)
+
+        return conditions
+
+
+#------------------------------------------------------------------------------#
 # Manage data and saving paths.
 root_path = Path(r"E:\SPIM_data\bead_data\SJS\optimization")
-savedir = get_unique_dir(root_path, "to_use_lowthreshold_easyfiltering_midcropping")
+savedir = get_unique_dir(root_path,
+                         "to_use_lowthreshold_easyfiltering_midcropping")
 
 # Data was taken such that each cuvette position is it's own root name.
 cuv_pos_dirs = [_d for _d in root_path.iterdir() if "cuv" in _d.name]
@@ -137,7 +168,8 @@ def plot_average_psf(r,
 
     for ii in range(len(psf_percentiles)):
         # only keep smallest so many percent of spots
-        sigma_max = np.percentile(fit_params[:, 4][to_keep], psf_percentiles[ii])
+        sigma_max = np.percentile(fit_params[:, 4][to_keep],
+                                  psf_percentiles[ii])
         to_use = np.logical_and(to_keep, fit_params[:, 4] <= sigma_max)
 
         # get centers

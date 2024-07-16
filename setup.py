@@ -15,7 +15,8 @@ required_pkgs = ['numpy',
                  'tqdm',
                  'dask',
                  'zarr',
-                 'tifffile'
+                 'ndtiff',
+                 'localize_psf @ git+https://git@github.com/qi2lab/localize-psf@master#egg=localize_psf'
                  ]
 
 extras = None
