@@ -19,7 +19,7 @@ from pathlib import Path
 
 DEBUG = False
 
-root_dir = Path('/home/steven/Documents/qi2lab/github/raytracing_sjs/data')
+root_dir = Path(r'C:\Users\Steven\Documents\qi2lab\github\SPIM_model\data')
 save_dir = Path('Doublet lens test')
 savedir = rt.get_unique_dir(root_dir, save_dir)
 

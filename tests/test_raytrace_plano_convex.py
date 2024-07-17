@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 from matplotlib.widgets import Slider
 
-root_dir = Path('/home/steven/Documents/qi2lab/github/raytracing_sjs/data')
+root_dir = Path(r'C:\Users\Steven\Documents\qi2lab\github\SPIM_model\data')
 save_dir = Path('lens_testing')
 savedir = rt.get_unique_dir(root_dir, save_dir)
 
@@ -99,7 +99,10 @@ def model(lens_radius=-100,
     #------------------------------------------------------------------------#
     # raytrace lens
     n_rays = 51
-    rays = rt.create_rays(type='flat_top', source='infinity', n_rays=n_rays, diameter=lens_diameter)
+    rays = rt.create_rays(type='flat_top',
+                          source='infinity',
+                          n_rays=n_rays,
+                          diameter=lens_diameter)
 
     rays = lens.raytrace(rays)
 

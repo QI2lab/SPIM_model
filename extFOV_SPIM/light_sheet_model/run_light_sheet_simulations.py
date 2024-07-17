@@ -296,23 +296,6 @@ for _result in results_dicts:
                                              return_field=False
                                              )
         print(f"\nGenerating initial fields . . . ")
-        # generate fast axis initial fields
-        # with ProgressBar():
-        #     tasks = [dask.delayed(
-        #         rt.raytrace_to_field)(results=_rt,
-        #                               grid_params=initial_field_params,
-        #                               wl=wl,
-        #                               amp_binning="doane",
-        #                               grid_padding=x_padding,
-        #                               plot_rays_to_field=plot_propagation,
-        #                               plot_raytrace_results=plot_raytracing,
-        #                               label=(f"{full_aperture*apt_scales[ii]:.1f}apt_"
-        #                                      + f"{_rt['optical_train'][1].dpt:.2f}dpt_"
-        #                                       + f"{_result['label']}"),
-        #                               savedir=plot_dir
-        #                               )
-        #             for _rt in raytrace_results]
-        #     initial_field = dask.compute(*tasks)
 
         initial_field = []
         for _rt in tqdm(raytrace_results):

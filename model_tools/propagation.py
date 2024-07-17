@@ -22,7 +22,7 @@ import model_tools.raytrace as rt
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import PowerNorm
-from scipy.integrate import simps
+from scipy.integrate import simpson as simps
 from scipy.interpolate import interp1d
 from pathlib import Path
 import gc

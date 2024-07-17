@@ -7,7 +7,8 @@ import model_tools.raytrace as rt
 import numpy as np
 from scipy.special import j1 as bessel1
 from scipy.special import j0 as bessel0
-from scipy.integrate import simps, quad, dblquad
+from scipy.integrate import quad
+
 # multi processing with dask
 import dask
 from dask.diagnostics import ProgressBar

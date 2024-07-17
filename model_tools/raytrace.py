@@ -63,7 +63,7 @@ def create_rays(type: str = "gaussian",
     :param str type: radial distribution, "guassian" "uniform" "flat_top"
     :param str source: angular distribution, "infinity" or "point"
     :param int n_rays: number of rays
-    :param float diameter: beam diameter, Gaussian intensity 1/e radius-> 2*sigma, else -> 2*radius .
+    :param float diameter: beam diameter, Gaussian intensity 1/e width
     :param float radial_offset: radial offset distance from optical axis, mm
     :param float sampling_limit: Scipy truncation distance in terms of sigmas
     :para float na: initial rays numerical aperture, required for point source
@@ -1946,28 +1946,33 @@ def rays_to_field(mask_radius: np.ndarray,
                                                       segmentdata=cdict)
 
         # Plotting
-        fig = plt.figure(figsize=(22, 10))
-        fig.suptitle(title, fontsize=20)
-        grid = fig.add_gridspec(nrows=3,
-                                ncols=4,
-                                width_ratios=[1, 1, 1, 0.075],
-                                height_ratios=[1, 0.05, 1],
-                                wspace=0.25,
-                                hspace=0.25)
+        fig = plt.figure(figsize=(8.0, 5.0))
+        fig.suptitle(title, fontsize=16)
+        grid = fig.add_gridspec(nrows=2,
+                                ncols=5,
+                                width_ratios=[0.65, 0.65, 0.001, 1, 0.075],
+                                height_ratios=[1, 1],
+                                wspace=0.35,
+                                hspace=0.40)
+        label_size = 12
+        ticklbl_size = 10
+        title_size = 12
+        label_pad = 2
 
         # Plot amplitude histogram
         ax = fig.add_subplot(grid[0, 0])
-        ax.set_title("Ray Density", fontsize=12)
-        ax.set_ylabel(r"A.U.", fontsize=10)
+        ax.set_title("$\phi(r)$", fontsize=title_size)
+        ax.set_ylabel(r"# of rays", fontsize=label_size, labelpad=label_pad)
         ax.plot(bin_centers, ray_density, ".m", ms=1, c="r")
-        ax.set_xticklabels([])
+        ax.tick_params(axis="both", pad=5,
+                       labelsize=ticklbl_size, labelbottom=False)
 
         # Plot amplitude
         ax = fig.add_subplot(grid[0, 1])
-        ax.set_title("Flux(r)", fontsize=12)
-        ax.set_ylabel(r"A.U.", fontsize=10)
+        ax.set_title("$\phi_{int}(r)$", fontsize=title_size)
         ax.plot(radius, flux_interp(radius), ".m", ms=1)
-        ax.set_xticklabels([])
+        ax.tick_params(axis="both", labelsize=ticklbl_size,
+                       labelbottom=False, labelleft=False)
 
         # Plot field intensity
         extent_xy = [-mask_radius[0,0],
@@ -1975,57 +1980,71 @@ def rays_to_field(mask_radius: np.ndarray,
                      -mask_radius[0,0],
                      mask_radius[0,0]]
 
-        ax = fig.add_subplot(grid[0, 2])
-        ax.set_title("Normalized field intensity", fontsize=12)
-        ax.set_xlabel(r"x (mm)", fontsize=10)
-        ax.set_ylabel(r"y (mm)", fontsize=10)
-        ax.yaxis.set_major_locator(MaxNLocator(3))
-        ax.xaxis.set_major_locator(MaxNLocator(3))
-        im = ax.imshow(np.abs(field)**2/np.max(np.abs(field)**2),
-                       cmap="hot",
-                       norm=PowerNorm(gamma=0.9),
-                       origin="lower",
-                       extent=extent_xy,
-                       interpolation=None)
+        ax_i = fig.add_subplot(grid[0, 3])
+        ax_i.set_title("$I(r)$", fontsize=title_size)
+        ax_i.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
+        ax_i.yaxis.set_major_locator(MaxNLocator(3))
+        ax_i.xaxis.set_major_locator(MaxNLocator(3))
+        ax_i.set_xticks([-0.2, 0.0, 0.2])
+        ax_i.tick_params(axis="both", labelsize=label_size)
+        im = ax_i.imshow(np.abs(field)**2/np.max(np.abs(field)**2),
+                         cmap="hot",
+                         vmin=0,
+                         origin="lower",
+                         extent=extent_xy,
+                         interpolation=None)
 
         # Cbar axes
-        cax = fig.add_subplot(grid[0, 3])
+        cax = fig.add_subplot(grid[0, 4])
         cbar = plt.colorbar(im, cax=cax)
-        cbar.ax.set_ylabel("A.U.", rotation="horizontal", labelpad=18)
+        cbar.set_ticks([0.0, 0.5, 1.0])
+        cbar.ax.set_ylabel("A.U.", rotation="horizontal", labelpad=17, fontsize=12)
 
-        # Plot wavefront
-        ax = fig.add_subplot(grid[2, 0])
-        ax.set_title("raw $OPL(x)$", fontsize=12)
-        ax.set_ylabel(r"OPL (mm)",fontsize=10)
-        ax.set_xlabel(r"Radius (mm)", fontsize=10)
-        ax.plot(last_rays[:, 0][keep_idx], last_rays[:, 3][keep_idx], "-m")
-        ax.set_xlabel(r"Radius (mm)", fontsize=10)
-
-        # Plot phase
-        ax = fig.add_subplot(grid[2, 1])
-        ax.set_title("$OPL_{interp}(x)$", fontsize=12)
-        ax.set_ylabel(r"A.U.", fontsize=10)
-        ax.plot(radius, phase_interp(radius), ".m", ms=1)
+        # Plot opl
+        ax = fig.add_subplot(grid[1, 0])
+        t_str = "$\Delta OPL(r)$"
+        ax.set_title(t_str, fontsize=title_size)
+        ax.set_ylabel(r"OPL (mm)",fontsize=label_size, labelpad=label_pad)
+        ax.set_xlabel(r"Radius (mm)", fontsize=label_size, labelpad=label_pad)
+        ax.tick_params(axis="both", labelsize=ticklbl_size)
+        ax.plot(last_rays[:, 0][keep_idx],
+                last_rays[:, 3][keep_idx] - np.nanmean(last_rays[:, 3][keep_idx]),
+                "-m")
 
         # Plot phase
-        ax = fig.add_subplot(grid[2, 2])
-        ax.set_title("Field phase, $\Phi(r)$}", fontsize=12)
-        ax.set_ylabel(r"y (mm)", fontsize=10)
-        ax.set_xlabel(r"x (mm)", fontsize=10)
+        ax = fig.add_subplot(grid[1, 1])
+        t_str = "$\Delta OPL_{int}(r)$"
+        ax.set_title(t_str, fontsize=title_size)
+        # ax.set_ylabel(f"{t_str} (mm)",fontsize=label_size)
+        ax.set_xlabel(r"Radius (mm)", fontsize=label_size, labelpad=label_pad)
+        ax.plot(radius[::5], phase_interp(radius[::5]), ".m", ms=1)
+        ax.tick_params(axis="both",
+                       labelsize=ticklbl_size, labelleft=False)
+
+        # Plot 2d phase
+        abs_max = np.max(np.abs(phase))
+        ax = fig.add_subplot(grid[1, 3], sharex=ax_i, sharey=ax_i)
+        ax.set_title("$\Phi(r)$", fontsize=title_size)
+        ax.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
+        ax.set_xlabel(r"x (mm)", fontsize=label_size, labelpad=label_pad)
         ax.yaxis.set_major_locator(MaxNLocator(3))
         ax.xaxis.set_major_locator(MaxNLocator(3))
+        ax.tick_params(axis="both", labelsize=label_size)
+
         im = ax.imshow(phase,
+                       extent=extent_xy,
                        cmap=black_centered_cmap,
-                       vmin=-np.max(np.abs(phase)),
-                       vmax=np.max(np.abs(phase)),
+                       vmin=-abs_max,
+                       vmax=abs_max,
                        origin="lower",
                        aspect="equal",
                        interpolation=None)
 
         # Cbar axes
-        cax = fig.add_subplot(grid[2, 3])
+        cax = fig.add_subplot(grid[1, 4])
         cbar = plt.colorbar(im, cax=cax)
-        cbar.ax.set_ylabel("A.U.", rotation="horizontal", labelpad=12)
+        cbar.ax.set_ylabel("A.U.", rotation="horizontal",
+                           labelpad=15, fontsize=12)
 
         if save_path:
             plt.savefig(save_path)
@@ -2760,12 +2779,8 @@ def plot_radial_distribution(rays: np.ndarray,
     radius_i = rays_i[:, 0]
     radius_f = rays_f[:, 0]
 
-    hist_i, bins_i = np.histogram(radius_i, bins=binning, density=True)
-    hist_f, bins_f = np.histogram(radius_f, bins=binning, density=True)
-
-    bins = [bins_i, bins_f]
-    hists = [hist_i, hist_f]
-    labels = ["Initial Rays", "Final Rays"]
+    hist_i, bins_i = np.histogram(radius_i, bins=binning, density=False)
+    hist_f, bins_f = np.histogram(radius_f, bins=int((radius_f.max()/radius_i.max())*binning), density=False)
 
     fig, ax = plt.subplots(1, 1, figsize=(16, 8))
     fig.suptitle(title, fontsize=16)
@@ -2774,10 +2789,8 @@ def plot_radial_distribution(rays: np.ndarray,
     ax.set_xlabel("Radius off OA, mm", fontsize=14)
     ax.set_ylabel("PDF", fontsize=14)
 
-    colors = ["r", "b"]
-    for ii in range(len(bins)):
-        ax.plot(bins[ii][:-1], hists[ii], ".", c=colors[ii], label=labels[ii])
-
+    ax.plot(bins_i[:-1], hist_i, ".", c="r", label="Initial Rays")
+    ax.plot(bins_f[:-1], hist_f, ".", c="b", label="Final Rays")
     ax.legend(loc=0, fontsize=14)
 
     if save_path:
