@@ -21,7 +21,7 @@ fig_version = True
 #------------------------------------------------------------------------------#
 # Manage results and saving directories
 result_path = Path(
-    r"E:\SPIM_data\bead_data\SJS\optimization\20240621_165444_to_use_lowthreshold_easyfiltering_midcropping\localization_results.npy"
+    r"E:\SPIM_data\bead_data\SJS\optimization\20240716_114052_paper_results\localization_results.npy"
     )
 save_dir = result_path.parent
 

@@ -20,14 +20,14 @@ import matplotlib as mpl
 mpl.use("TkAgg")
 
 # Plotting flags
-showfig = False
+showfig = True
 plot_interactive_results = False
 run_inair = False
 run_mitu = True
 run_nikon = False
-fig_version = True
+fig_version = False
 savedir_path = Path(
-    r"C:\Users\qi2lab\Documents\github\raytracing_sjs\extFOV_model\data"
+    r"E:\SPIM_data\bead_data\SJS\optimization\20240716_114052_paper_results"
     )
 
 # Calculate focal shift with respect to:
@@ -277,15 +277,9 @@ def create_heatmap_figure(exc_obj,
                           fig_shape=(3.5, 1.75),
                           axes_label_fontsize=8,
                           axes_tick_fontsize=8,
-                          grid_width_ratios=[1, 0.075, 0.3, 1, 0.075],
                           axial_max=150,
-                          transverse_max=20,
-                          axial_yticks=[10,20,30],
-                          transverse_cbar_ticks=[0, 10, 20],
-                          axial_cbar_ticks=[0, 10, 20],
                           xlim=10,
                           cmap_axial="coolwarm",
-                          cmap_trans="Reds",
                           showfig=True,
                           final_version=False):
     """
@@ -528,15 +522,9 @@ if run_mitu:
                                     fig_shape=figsize,
                                     axes_label_fontsize=axes_label_ftsize,
                                     axes_tick_fontsize=axes_tick_ftsize,
-                                    grid_width_ratios=grid_widths,
                                     axial_max=axial_max,
-                                    transverse_max=trans_max,
-                                    axial_yticks=axial_yticks,
-                                    transverse_cbar_ticks=trans_cbar_ticks,
-                                    axial_cbar_ticks=axial_cbar_ticks,
                                     xlim=xlim,
                                     cmap_axial="coolwarm",
-                                    cmap_trans="Reds",
                                     showfig=True,
                                     final_version=fig_version)
 if run_nikon:
@@ -545,15 +533,9 @@ if run_nikon:
                                     fig_shape=figsize,
                                     axes_label_fontsize=axes_label_ftsize,
                                     axes_tick_fontsize=axes_tick_ftsize,
-                                    grid_width_ratios=grid_widths,
                                     axial_max=axial_max,
-                                    transverse_max=trans_max,
-                                    axial_yticks=[5, 10, 20],
-                                    transverse_cbar_ticks=trans_cbar_ticks,
-                                    axial_cbar_ticks=axial_cbar_ticks,
                                     xlim=xlim,
                                     cmap_axial="coolwarm",
-                                    cmap_trans="Reds",
                                     showfig=True,
                                     final_version=fig_version)
 if run_inair:
@@ -776,8 +758,8 @@ if plot_interactive_results:
     update_mismatched_fig(None)
     fig_mis.show()
 
-# if showfig:
-#     plt.show()
+if showfig:
+    plt.show()
 
-# else:
-#     plt````````````.close("all")
+else:
+    plt.close("all")

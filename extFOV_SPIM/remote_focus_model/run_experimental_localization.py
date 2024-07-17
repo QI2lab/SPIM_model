@@ -81,7 +81,7 @@ class boundary_filter(filter):
 # Manage data and saving paths.
 root_path = Path(r"E:\SPIM_data\bead_data\SJS\optimization")
 savedir = get_unique_dir(root_path,
-                         "to_use_lowthreshold_easyfiltering_midcropping")
+                         "paper_results")
 
 # Data was taken such that each cuvette position is it's own root name.
 cuv_pos_dirs = [_d for _d in root_path.iterdir() if "cuv" in _d.name]
@@ -410,6 +410,7 @@ def plot_fit_rois(r,
 
     results = dask.compute(*delayed)
 
+
 #------------------------------------------------------------------------------#
 # Acquisition parameters
 wl = 0.473
@@ -425,7 +426,7 @@ min_spot_sep = (4., 4.)
 threshold = 2000
 amp_bounds = (1000, np.inf)
 sxy_bounds = (1.5, 8.0)
-sz_bounds = (1., 15)
+sz_bounds = (0.5, 15)
 fit_dist_max_err = (15.0, 10.0)
 fit_roi_size = (35.0, 25, 25)
 dist_boundary_min = (1.0, 1.0)
