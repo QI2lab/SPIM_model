@@ -37,8 +37,6 @@ plot_light_sheet_slices = True
 # where to save results
 root_dir = Path("/mnt/server1/extFOV/light_sheet/simulations")
 s_str = f'gaussian_light_sheet_model'
-# s_str = f'for_fig_image'
-# s_str = "f20_f180f150_r60"
 savedir = rt.get_unique_dir(root_dir, Path(s_str))
 
 #------------------------------------------------------------------------#
@@ -161,11 +159,12 @@ index_mismatch =  rt.Thick_lens(z1=((exc_obj.ffp-exc_obj.wd) + cuvette_offset),
 
 # Define remote focus distances
 etl_dpts = np.linspace(-3.0, 3.0, 11)
-# etl_dpts = np.array([0])
+
 # Define "aperture" conjugate to BFP for cropping initial rays
-full_aperture = 6.0 # radius, experimental=6.0
+full_aperture = 6.0
 apt_scales = np.array([1.00, 0.88, 0.80, 0.70, 0.65,
                        0.58, 0.50, 0.45, 0.41, 0.38])
+
 # Define the experimental distance between the obj. surface and cuvette
 cuvette_offset = 6.5
 
@@ -257,9 +256,6 @@ for _result in results_dicts:
         print(f"\nAperture {ii+1} / {len(optical_trains)}",
               f"\nRaytracing {len(ots)} optical trains . . .  ")
 
-        # rt_dir = plot_dir / Path("raytrace_plots")
-        # rt_dir.mkdir(exist_ok=True)
-
         # Raytrace
         with ProgressBar():
             tasks = [dask.delayed(rt.raytrace_ot)(optical_train=ot,
@@ -275,9 +271,6 @@ for _result in results_dicts:
 
         #---------------------------------------------------------------------#
         # Create electric fields from ray tracing results
-        # rt_field_dir = plot_dir / Path("rays_to_field_plots")
-        # rt_field_dir.mkdir(exist_ok=True)
-
         # Update model grid params
         dz = _result["dzs"][ii]
         dx = _result["dx"]
@@ -315,8 +308,6 @@ for _result in results_dicts:
                                   )
         #---------------------------------------------------------------------#
         print(f"\nGenerating 3d electric fields . . . ")
-        # field_dir = plot_dir / Path("field_plots")
-        # field_dir.mkdir(exist_ok=True)
         # Create field grid to use for field propagation
         shared_grid_params = pt.field_grid(num_xy=n_xy,
                                            num_zx=n_zx,
