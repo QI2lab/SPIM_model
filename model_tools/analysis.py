@@ -1098,22 +1098,16 @@ def load_light_sheet_acquisition(acq_dir: Path,
             "acq_dir_path":acq_dir}
 
 
-def plot_light_sheet(results: dict,
-                     show_focal_planes: bool = False,
-                     show_edges: bool = False,
-                     show_legend: bool = False,
+def plot_light_sheet(results,
+                     show_focal_planes = False,
+                     show_edges = False,
+                     show_legend=False,
                      ax = None,
-                     ax_title: str = None,
-                     show_cbar: bool = False,
-                     show_scale: bool = False,
-                     scale_length: float = 50,
-                     z_range: float = 50,
-                     x_range: float = 25,
-                     return_im: bool = False):
-    """
-    Plot light sheet slice with width/length parameters
-    """
-
+                     ax_title = None,
+                     show_cbar = False,
+                     z_range=50,
+                     x_range=25,
+                     return_im=False):
     ls_slice = results["light_sheet_slice"]
     dx = results["dx"]
     dz = results["dz"]
@@ -1232,18 +1226,6 @@ def plot_light_sheet(results: dict,
                   framealpha=0.1,
                   labelcolor="white"
                   )
-    if show_scale is True:
-        scalebar = ScaleBar(dx=1,
-                            units="um",
-                            location='lower right',
-                            fixed_value=scale_length,
-                            fixed_units="um",
-                            dimension="si-length",
-                            color='white',
-                            frameon=False,
-                            box_alpha=0.2
-                            )
-        ax.add_artist(scalebar)
 
     if show_cbar:
         plt.colorbar(im)

@@ -15,10 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 import model_tools.raytrace as rt
-import model_tools.propagation as pt
-from matplotlib_scalebar.scalebar import ScaleBar
-
-# from model_tools.analysis import plot_light_sheet
+from model_tools.analysis import plot_light_sheet
 
 # imports
 from pathlib import Path
@@ -31,17 +28,17 @@ import matplotlib.pyplot as plt
 showfig = False
 final_version = True
 # Setup the saving / loading directories
-savedir = rt.get_unique_dir("/mnt/server1/extFOV/light_sheet/analysis_results",
-                            "lightsheet_comparison_150100")
+savedir = rt.get_unique_dir("/mnt/tilingspim/extFOV_results",
+                            "ls_model_results")
 
 #-----------------------------------------------------------------------------#
 # Load experimental and simualtion results
 #-----------------------------------------------------------------------------#
 sim_dir = Path(
-    "/mnt/server1/extFOV/light_sheet/simulations/20240715_120957_150100_60_gaussian"
+    "/mnt/server1/extFOV/light_sheet/simulations/20240717_152157_gaussian_light_sheet_model"
     )
 acq_dir = Path(
-    "/mnt/server1/extFOV/light_sheet/acquisitions/to_plot_results"
+    "/mnt/server1/extFOV/light_sheet/acquisitions/20240717_141851_ls_acq_results"
     )
 # Compile result dictionaries
 sim_fnames = [_fn for _fn in sim_dir.iterdir() if ".npy" in _fn.name]
@@ -268,165 +265,6 @@ ax.legend(fontsize=axes_legend_fontsize,
 
 #-----------------------------------------------------------------------------#
 # Plot heatmap light sheet results.
-
-def plot_light_sheet(results,
-                     show_focal_planes = False,
-                     show_edges = False,
-                     show_legend=False,
-                     ax = None,
-                     ax_title = None,
-                     show_cbar = False,
-                     show_scale = False,
-                     scale_length = 50,
-                     z_range=50,
-                     x_range=25,
-                     return_im=False):
-    ls_slice = results["light_sheet_slice"]
-    dx = results["dx"]
-    dz = results["dz"]
-    fp = np.argmin(np.abs(results["stage_positions"]
-                           - results["diffraction_focal_plane"])
-                   )
-    if z_range or x_range:
-        # Crop light sheet array down before plotting
-        n_z = ls_slice.shape[0]
-        n_xy = ls_slice.shape[1]
-
-        if z_range and x_range:
-            z_trim = int((z_range/dz)/2)
-            x_trim = int((x_range/dx)/2)
-            ls_slice = ls_slice[fp-z_trim:fp+z_trim,
-                                n_xy//2-x_trim:n_xy//2+x_trim
-                                ]
-
-        elif z_range and x_range is None:
-            z_trim = int((z_range/dz)/2)
-            ls_slice = ls_slice[fp-z_trim:fp+z_trim,
-                                :]
-        elif x_range and z_range is None:
-            x_trim = int((x_range/dx)/2)
-            ls_slice = ls_slice[:,
-                                n_xy//2-x_trim:n_xy//2+x_trim
-                                ]
-    else:
-        fp = np.argmin(np.abs(results["stage_positions"]
-                              - results["diffraction_focal_plane"]))
-
-    n_zx, n_xy, = ls_slice.shape
-    # Enforce odd numbers
-    if n_xy%2 == 0:
-        n_xy += 1
-    if n_zx%2 == 0:
-        n_zx += 1
-    grid_params = pt.field_grid(num_xy=n_xy,
-                                num_zx=n_zx,
-                                dx=dx,
-                                dz=dz,
-                                return_field=False
-                                )
-    try:
-        z_start = results["stage_positions"][fp-n_zx//2]
-        grid_params[-1][0] += 0
-        grid_params[-1][1] += results["stage_positions"][fp+n_zx//2] - z_start
-    except:
-        zmax = max([len(results["stage_positions"]) - fp, fp])
-        z_start = results["stage_positions"][fp-zmax//2]
-        grid_params[-1][0] += 0
-        grid_params[-1][1] += results["stage_positions"][fp+zmax//2] - z_start
-        print(f"z_range is too large, zmax={zmax}")
-
-
-    if ax is None:
-        fig, ax = plt.subplots(1,1, figsize=(7,3))
-        ax.set(ylabel="r ($\me m$)", xlabel="z (\mu m$")
-        show_cbar=True
-
-    if ax_title is not None:
-        ax.set_title(ax_title)
-
-    im = ax.imshow(np.rot90(ls_slice/ls_slice.max(),1),
-                    cmap='hot',
-                    extent=grid_params[-1],
-                    aspect='auto',
-                    origin='lower',
-                    interpolation=None,
-                    vmin=0, vmax=1
-                    )
-    # add results to top corner of plot
-    ax.text(0.05, 0.95,
-            f"L: {results['length']:.0f}$\mu m$\nW: {results['width']:.1f}$\mu m$",
-            color="white",
-            fontsize=9,
-            ha="left", va="top",
-            transform=ax.transAxes)
-
-    if show_edges:
-        ax.axvline(x=results["diffraction_focal_plane"] - z_start,
-                    label="focal plane",
-                    linestyle="-",
-                    color="white"
-                    )
-        try:
-            ax.axvline(x=results["left_edge"] - z_start,
-                        label="edge",
-                        linestyle="--",
-                        color="white"
-                        )
-            ax.axvline(x=results["right_edge"] - z_start,
-                        linestyle="--",
-                        color="white"
-                        )
-        except:
-            pass
-    if show_focal_planes:
-        ax.axvline(x=results["midpoint_focal_plane"] - z_start,
-                    label="mipoint",
-                    linestyle="--",
-                    color="g"
-                    )
-        ax.axvline(x=results["paraxial_focal_plane"] - z_start,
-                    label="paraxial",
-                    linestyle="--",
-                    color="limegreen"
-                    )
-        ax.axvline(x=results["marginal_focal_plane"] - z_start,
-                    label="marginal",
-                    linestyle="--",
-                    color="red"
-                    )
-    if show_legend:
-        ax.legend(fontsize=7,
-                  framealpha=0.1,
-                  labelcolor="white"
-                  )
-    if show_scale is True:
-        scalebar = ScaleBar(dx=1,
-                            units="um",
-                            location='lower right',
-                            fixed_value=scale_length,
-                            fixed_units="um",
-                            dimension="si-length",
-                            color='white',
-                            frameon=False,
-                            box_alpha=0.2
-                            )
-        ax.add_artist(scalebar)
-
-        # # manually draw scalebar
-        # q = scale_length / (n_zx * dz)
-        # print(q)
-        # ax.axhline(y=0,
-        #            xmin=grid_params[-1][0],
-        #            xmax=grid_params[-1][0]+ scale_length,
-        #            color="white", ls="-", lw=1)
-
-    if show_cbar:
-        plt.colorbar(im)
-    if return_im:
-        return im
-    else:
-        return None
-
 # Add plots of example light sheets.
 # Start with two low NA examples
 n_acq_air = len(r_acq_air)
@@ -434,17 +272,16 @@ n_sim_air = len(r_sim_air)
 sim_etl = len(r_sim_air[n_sim_air-1]["results"])//2 -1
 acq_etl = len(r_acq_air[n_acq_air-1]["results"])//2 -1
 high_na_idx = [n_sim_air-1, n_acq_air-2]
-low_na_idx = [2,2]
-defocus_idx = [5,5]
+low_na_idx = [3,2]
+defocus_idx = [8,5]
 high_na = [r_sim_air[high_na_idx[0]]["results"][sim_etl],
           r_acq_air[high_na_idx[1]]["results"][acq_etl]]
 low_na = [r_sim_air[low_na_idx[0]]["results"][sim_etl],
-          r_acq_air[low_na_idx[1]]["results"][acq_etl]]
-defocused = [r_sim_wat[defocus_idx[0]]["results"][1],
+          r_acq_air[low_na_idx[1]]["results"][15]]
+defocused = [r_sim_wat[defocus_idx[0]]["results"][0],
              r_acq_wat[defocus_idx[1]]["results"][-2]]
 
 # plot args
-show_scale = False
 x_range = 50
 
 # Plot high NA examples
@@ -455,16 +292,12 @@ plot_light_sheet(high_na[0],
                  show_edges = True,
                  show_legend=False,
                  ax = sim_ax_h,
-                 show_scale=show_scale,
-                 scale_length=25,
                  z_range=z_range,
                  x_range=x_range)
 im = plot_light_sheet(high_na[1],
                       show_edges = True,
                       show_legend=False,
                       ax = acq_ax_h,
-                      show_scale=show_scale,
-                      scale_length=25,
                       z_range=z_range,
                       x_range=x_range,
                       return_im=True)
@@ -493,21 +326,17 @@ acq_ax_h.tick_params(axis="x",
 # Plot low NA examples
 sim_ax_L = fig.add_subplot(grid[2,2])
 acq_ax_L = fig.add_subplot(grid[4,2])
-z_range = 180
+z_range = 200
 plot_light_sheet(low_na[0],
                  show_edges = True,
                  show_legend=False,
                  ax = sim_ax_L,
-                 show_scale=show_scale,
-                 scale_length=100,
                  z_range=z_range,
                  x_range=x_range)
 im = plot_light_sheet(low_na[1],
                       show_edges = True,
                       show_legend=False,
                       ax = acq_ax_L,
-                      show_scale=show_scale,
-                      scale_length=100,
                       z_range=z_range,
                       x_range=x_range,
                       return_im=True)
@@ -538,13 +367,11 @@ acq_ax_L.tick_params(axis="both",
 # Plot defocused example
 sim_ax_d = fig.add_subplot(grid[2,4])
 acq_ax_d = fig.add_subplot(grid[4,4])
-z_range = 120
+z_range = 109
 im = plot_light_sheet(defocused[0],
                  show_edges = True,
                  show_legend=False,
                  ax = sim_ax_d,
-                 show_scale=show_scale,
-                 scale_length=50,
                  z_range=z_range,
                  x_range=x_range,
                  return_im=True)
@@ -552,8 +379,6 @@ im = plot_light_sheet(defocused[1],
                       show_edges = True,
                       show_legend=False,
                       ax = acq_ax_d,
-                      show_scale=show_scale,
-                      scale_length=50,
                       z_range=z_range,
                       x_range=x_range,
                       return_im=True)
@@ -589,51 +414,3 @@ if final_version:
     fig.savefig(savedir / Path("lengths_vs_widths.svg"))
 else:
     fig.savefig(savedir / Path("lengths_vs_widths.png"))
-
-
-#-----------------------------------------------------------------------------#
-# plot the defocus results
-#-----------------------------------------------------------------------------#
-grid_height_ratio = [1,0.2,1]
-grid_width_ratio = [1,0.2,1]
-fig_shape = (8,8)
-fig = plt.figure(figsize=fig_shape)
-grid = fig.add_gridspec(nrows=len(grid_height_ratio),
-                        ncols=len(grid_width_ratio),
-                        width_ratios=grid_width_ratio,
-                        height_ratios=grid_height_ratio,
-                        wspace=0.1,
-                        hspace=0.1
-                        )
-
-ax = fig.add_subplot(grid[0,0])
-ax.set_title("In air results")
-ax.set_xlabel("remote focus dz $(\mu m)$")
-ax.set_ylabel("$\omega_0$")
-
-# plot the focal params as function of remote focus distance
-for _res in r_acq_air:
-    ax.plot(_res["remote_focus_dzs"], _res["widths"], "--")
-
-ax = fig.add_subplot(grid[0,2], sharey=ax, sharex=ax)
-ax.set_title("In air results")
-ax.set_xlabel("remote focus dz $(\mu m)$")
-
-for _res in r_acq_wat:
-    ax.plot(_res["remote_focus_dzs"], _res["widths"], "--")
-
-# plot the model
-ax = fig.add_subplot(grid[2,0], sharex=ax)
-ax.set_title("In air results")
-ax.set_xlabel("remote focus dz $(\mu m)$")
-ax.set_ylabel("$\omega_0$")
-
-for _res in r_sim_air:
-    ax.plot(_res["remote_focus_dzs"], _res["widths"], "--")
-
-ax = fig.add_subplot(grid[2,2], sharey=ax, sharex=ax)
-ax.set_title("In air results")
-ax.set_xlabel("remote focus dz $(\mu m)$")
-
-for _res in r_sim_wat:
-    ax.plot(_res["remote_focus_dzs"], _res["widths"], "--")
