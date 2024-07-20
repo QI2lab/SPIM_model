@@ -8,14 +8,15 @@ Steven Sheppard
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib_scalebar.scalebar import ScaleBar
 from pathlib import Path
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from skimage import transform
-from pycromanager import Dataset
+from ndtiff import Dataset
+
 import dask
+
 from dask.diagnostics import ProgressBar
 import model_tools.propagation as pt
 from model_tools.analytic_forms import (gaussian_intensity,
