@@ -1834,7 +1834,7 @@ def rays_to_field(mask_radius: np.ndarray,
                   rays: np.ndarray,
                   ko: float,
                   amp_binning: str = "doane",
-                  amp_type: str = "power",
+                  amp_type: str = "flux",
                   phase_type: str = "opld",
                   power: float = 1.0,
                   results:str = "field",
@@ -1899,11 +1899,16 @@ def rays_to_field(mask_radius: np.ndarray,
                                 fill_value=0)
         angles = angle_interp(mask_radius)
 
+        if amp_type=="pdf":
+            density=True
+        elif amp_type=="flux":
+            density=False
+
         # Use binning to calculate ray flux
         ray_density, bin_edges = np.histogram(radius,
                                               bins=amp_binning,
                                               range=(radius.min(),radius.max()),
-                                              density=False)
+                                              density=density)
 
         bin_centers = (bin_edges[:-1] + bin_edges[1:])/2
 
@@ -1926,7 +1931,7 @@ def rays_to_field(mask_radius: np.ndarray,
     # Optional, normalize to given power
     if amp_type=="power" and (results=="field" or results=="amplitude"):
         n_grid = mask_radius.shape[0]
-        dx = mask_radius[int(n_grid//2), int(n_grid//2 + 1)] - mask_radius[int(n_grid//2), int(n_grid//2)]
+        dx = mask_radius[int(n_grid//2),int(n_grid//2 + 1)] - mask_radius[int(n_grid//2), int(n_grid//2)]
         field = pt.normalize_field(field, power, dx)
 
     if plot_field:

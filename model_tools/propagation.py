@@ -793,6 +793,7 @@ def plot_xz_projection(fields: list = [],
 
         x, radius_xy, extent_xy, z, extent_zx = field_params
 
+
         # Convert from mm to um
         x = [1e3 * xx for xx in x]
         z = [1e3 * zz for zz in z]
@@ -827,7 +828,7 @@ def plot_xz_projection(fields: list = [],
                        cmap='hot',
                        extent=extent_zx,
                        origin="lower",
-                       aspect='equal',
+                    #    aspect='equal',
                        interpolation='none')
 
         # Cbar axes
