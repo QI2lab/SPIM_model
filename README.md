@@ -10,12 +10,12 @@ To install as a package use the following code snippet. In order to edit the pac
 TODO: Modify package name and update documentation.
 ```
 git clone
-cd raytracing_sjs
+cd SPIM_model
 pip install .
 ```
 ```
 git clone
-cd raytracing_sjs
+cd SPIM_model
 pip install -e .
 ```
 ## Intended use
