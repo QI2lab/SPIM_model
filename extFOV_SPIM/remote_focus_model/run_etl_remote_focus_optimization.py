@@ -17,18 +17,17 @@ import gc as gc
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, CheckButtons
 import matplotlib as mpl
-mpl.use("TkAgg")
+# mpl.use("TkAgg")
 
 # Plotting flags
-showfig = True
+showfig = False
 plot_interactive_results = False
 run_inair = False
 run_mitu = True
 run_nikon = False
 fig_version = False
-savedir_path = Path(
-    r"E:\SPIM_data\bead_data\SJS\optimization\20240716_114052_paper_results"
-    )
+root_dir = Path(r"C:\Users\Steven\Documents\qi2lab\github\SPIM_model\data")
+savedir_path = rt.get_unique_dir(root_dir, "remote_focus_results")
 
 # Calculate focal shift with respect to:
 #   "cuv" (last cuvette surface, exp.)
@@ -37,7 +36,7 @@ savedir_path = Path(
 focus_shift_plane = "cuv"
 
 # figure parameters for heatmaps
-num_samples = 31
+num_samples = 11
 grid_widths = [0.85, 0.1, 0.5, 0.85, 0.1]
 trans_max = 50
 axial_max = 300
@@ -55,7 +54,7 @@ figsize = (3.0, 1.5)
 # Create set of rays to use for simulations
 rays_params = {"type":"flat_top",
                "source":"infinity",
-               "n_rays":501,
+               "n_rays":1e6,
                "diameter":18,
                "wl":0.000488}
 
@@ -143,7 +142,7 @@ mitutoyo = rt.Perfect_lens(z1=relay2.ffp + mitu_f,
                            fov=25,
                            mag=mitu_mag,
                            ri_in=1.0, ri_out=1.0,
-                           type="mitutoyo"
+                           type="mitutoyo obj."
                            )
 # Olympus 0.3 PlanFluor
 nikon_f = 20
@@ -157,7 +156,7 @@ nikon = rt.Perfect_lens(z1=relay2.ffp + nikon_f,
                         fov=25,
                         mag=nikon_mag,
                         ri_in=1.0, ri_out=1.0,
-                        type="nikon"
+                        type="nikon obj."
                         )
 
 #------------------------------------------------------------------------------#
@@ -200,26 +199,36 @@ def model_illumination_pathway(exc_obj,
                                  aperture_radius=cuvette_height/2,
                                  ri_in=1.00,
                                  ri_out=immersion_ri)
-
-        illumation_pathway = [_etl, relay1, relay2, exc_obj, _cuvette]
-        native_pathway = [flat_etl, relay1, relay2, exc_obj, _cuvette]
     else:
-        _cuvette = None
-        illumation_pathway = [_etl, relay1, relay2, exc_obj]
-        native_pathway = [flat_etl, relay1, relay2, exc_obj]
+        # Make the cuvette refractive index match air,
+        # Include in OT to avoid distinguishing between air/mismatched models
+        _cuvette = rt.Thick_lens(z1=exc_obj.ffp-exc_obj.wd,
+                                 r1=np.inf,
+                                 t=cuvette_wall_thickness,
+                                 ri=1.00,
+                                 r2=np.inf,
+                                 aperture_radius=cuvette_height/2,
+                                 ri_in=1.00,
+                                 ri_out=1.00)
+    # Create optical trains
+    illumation_pathway = [_etl, relay1, relay2, exc_obj, _cuvette]
+    native_pathway = [flat_etl, relay1, relay2, exc_obj, _cuvette]
 
-    # get the flat etl results for the given exc obj
+    # Get the flat etl results for the given exc obj
     native_r = rt.raytrace_ot(optical_train=native_pathway,
                               rays=initial_rays.copy(),
-                              fit_plane=None
+                              fit_plane="midpoint",
+                              return_rays="all",
+                              plot_raytrace_results=False
                               )
 
     # ray trace and calculate focal extent for the optical train of interest
     _r = rt.raytrace_ot(optical_train=illumation_pathway,
                         rays=initial_rays.copy(),
-                        fit_plane=None,
+                        fit_plane="midpoint",
                         return_rays="all",
-                        plot_raytrace_results=False
+                        plot_raytrace_results=True,
+                        save_path=savedir_path / Path(f"{dpt:.2f}dpt_{cuvette_offset}offset.png")
                         )
 
     # Calculate the ray tracing focal extent
@@ -232,10 +241,10 @@ def model_illumination_pathway(exc_obj,
     # Calculate the focal extent and shift
     _r["transverse_extent"] = np.abs((np.nanmax(rays[-1, :, 0])
                                       - np.nanmin(rays[-1, :, 0])))
-    _r["axial_extent"] = (_r["marginal_focal_plane"]
-                          - _r["paraxial_focal_plane"])
+    _r["axial_extent"] = _r["marginal_focal_plane"] - _r["paraxial_focal_plane"]
     _r["cuvette_offset"] = cuvette_offset
     _r["etl_dpt"] = dpt
+    _r["label"] = f"Cuvette Offset = {cuvette_offset}, ETL power: {dpt} diopters"
     _r["fail_reason"] = None
 
     # calculate focus shift, set at top of script
@@ -250,38 +259,26 @@ def model_illumination_pathway(exc_obj,
     # Check to make sure the focus is with in the cuvette volume
     if cuvette_offset:
         oa_crossings = rt.get_ray_oa_intersects(rays)
-        if 11 in oa_crossings or 12 in oa_crossings:
+        if oa_crossings[-1]==11 or oa_crossings[-1]==12:
             _r["axial_extent"] = np.nan
             _r["transverse_extent"] = np.nan
+            _r["focus_shift"] = np.nan
             _r["fail_reason"] = "focus before or in cuvette"
-
-    # Check to make sure the focus is in empty space, after the lens.
-    if _r["marginal_focal_plane"] < (exc_obj.bfp - exc_obj.wd):
-        _r["axial_extent"] = np.nan
-        _r["transverse_extent"] = np.nan
-        _r["fail_reason"] = "marginal ray in obj"
-    elif _r["paraxial_focal_plane"] < (exc_obj.bfp - exc_obj.wd):
-        _r["axial_extent"] = np.nan
-        _r["transverse_extent"] = np.nan
-        _r["fail_reason"] = "paraxial ray in obj"
-
-    # Check to see how many rays are lost.
-    if np.isnan(rays[-1, :, 0]).sum() > rays_params["n_rays"]*0.2:
-        _r["fail_reason"] = "lost rays"
 
     return _r
 
 
 def create_heatmap_figure(exc_obj,
                           num_samples,
-                          fig_shape=(3.5, 1.75),
-                          axes_label_fontsize=8,
-                          axes_tick_fontsize=8,
-                          axial_max=150,
-                          xlim=10,
-                          cmap_axial="coolwarm",
-                          showfig=True,
-                          final_version=False):
+                          fig_shape: tuple = (3.5, 1.75),
+                          axes_label_fontsize: int = 8,
+                          axes_tick_fontsize: int = 8,
+                          axial_max: float = 150,
+                          xlim: float = 10,
+                          cmap_axial: str = "coolwarm",
+                          model_label: str =None,
+                          showfig: bool = True,
+                          final_version: bool = False):
     """
     Simulate illumation pathway using the given excitation objective.
     Run ETL diopters \pm10 and over the physically possible cuvette positions.
@@ -306,8 +303,9 @@ def create_heatmap_figure(exc_obj,
     Returns:
         fig (optional): fig
     """
-    # Define the ETL diopter range to run all simulations
+    # Define the ETL diopter and cuvette offset range to run all simulations
     etl_dpt_samples = np.linspace(etl_dpt_min, etl_dpt_max, num_samples)
+    cuvette_offsets = np.linspace(0.1, exc_obj.f, num_samples)
 
     #--------------------------------------------------------------------------#
     # Create figure to plot results
@@ -323,15 +321,20 @@ def create_heatmap_figure(exc_obj,
 
     #--------------------------------------------------------------------------#
     # simulate exc_obj over cuvette positions and ETL diopters
-    cuvette_offsets = np.linspace(0.1, exc_obj.wd+5, num_samples)
     _r = []
-    for offset in cuvette_offsets:
-        for dpt in etl_dpt_samples:
+    for ii, offset in enumerate(cuvette_offsets):
+        for jj, dpt in enumerate(etl_dpt_samples):
+            print(f"Running model: offset{ii+1}/{num_samples} and dpt {jj}/{num_samples}", end="\r")
             _r.append(model_illumination_pathway(exc_obj=exc_obj,
                                                  dpt=dpt,
                                                  cuvette_offset=offset
                                                  )
                       )
+
+    # save results to propagat and plot specific configurations
+    if not model_label:
+        model_label = f"{exc_obj.na:.2f}NA_in_ri_mismatch"
+    np.save(savedir_path / Path(f"{model_label}_results.npy"), _r, allow_pickle=True)
 
     # Compile 1d arrays of results to plot
     cuv_offsets = np.array([_["cuvette_offset"] for _ in _r])

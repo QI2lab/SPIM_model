@@ -604,6 +604,9 @@ class Perfect_lens:
         :param float ri_out: Right hand side refractive index
         :return class Perfect_lens:
         """
+        # If no working distance is give, use the focal length
+        if not wd:
+            wd = f
         self.z1 = z1
         self.f = f
         self.na = na
@@ -993,7 +996,7 @@ def raytrace_ot(optical_train: list = [],
         focal_plane = fp_diffraction
 
         # neative to raytrace backwards from focal plane
-        fit_obj_f = -(focal_plane-obj.z1) / lens.ri_out
+        fit_obj_f = (focal_plane-obj.z1) / lens.ri_out
         fit_obj_z = focal_plane + fit_obj_f*lens.ri_out
 
         fit_obj =  Perfect_lens(z1=fit_obj_z,
@@ -1061,7 +1064,7 @@ def raytrace_ot(optical_train: list = [],
             focal_plane = fp_marginal
 
         # neative to raytrace backwards from focal plane
-        fit_obj_f = -(focal_plane-obj.z1) / lens.ri_out
+        fit_obj_f = (focal_plane-obj.z1) / lens.ri_out
         fit_obj_z = focal_plane + fit_obj_f*lens.ri_out
 
         fit_obj =  Perfect_lens(z1=fit_obj_z,
@@ -1483,7 +1486,6 @@ def get_ray_oa_intersects(rays: np.ndarray):
 
     ray_idx = max(ray_to_use, key=lambda idx: abs(rays[0, idx, 0]))
     crossings = np.where(np.diff(np.sign(rays[:, ray_idx, 0])))[0]
-
     return crossings
 
 
@@ -1833,7 +1835,7 @@ def ray_opl_strehl_with_amp(pupil_rays,
 def rays_to_field(mask_radius: np.ndarray,
                   rays: np.ndarray,
                   ko: float,
-                  amp_binning: str = "doane",
+                  amp_binning = 1000,
                   amp_type: str = "flux",
                   phase_type: str = "opld",
                   power: float = 1.0,
@@ -1854,7 +1856,7 @@ def rays_to_field(mask_radius: np.ndarray,
     :param array rays: Ray like array.
     :param float ko: Wave vector magnitude.
     :param str binning: Amplitude histogram bin arguement, use "doane" for gaussian or n_xy for generality
-    :param str amp_type: Choose amplitude normalization, "pdf" or "power"
+    :param str amp_type: Choose amplitude normalization, "pdf" or "flux"
     :param str phase_type: choose OPL or OPLD
     :param float power: Normalize field to carry total power
     :param str results: Specify whether to return the total "field", "amplitude" or "phase"
@@ -2070,11 +2072,12 @@ def rays_to_field(mask_radius: np.ndarray,
 def raytrace_to_field(results: dict,
                       grid_params: list,
                       wl: float,
-                      rays_to_field_z=None,
-                      grid_padding=0.100,
-                      amp_binning="doane",
-                      amp_type="power",
-                      power=1,
+                      rays_to_field_z: float = None,
+                      grid_padding: float = 0.100,
+                      amp_binning = 1000,
+                      amp_type: str = "flux",
+                      focal_plane: str = "midpoint",
+                      power: float = 1,
                       plot_rays_to_field: bool = False,
                       plot_raytrace_results: bool = False,
                       label: str = "",
@@ -2102,7 +2105,13 @@ def raytrace_to_field(results: dict,
                                               x_max=x.max(),
                                               padding=grid_padding)
     # calculate the field plane distance to the focus
-    dist_to_focus = rays_to_field_z - results["midpoint_focal_plane"]
+    if focal_plane=="midpoint":
+        focal_plane = "midpoint_focal_plane"
+    elif focal_plane=="paraxial":
+        focal_plane=="paraxial_focal_plane"
+    elif focal_plane=="marginal":
+        focal_plane=="marginal_focal_plane"
+    dist_to_focus = rays_to_field_z - results[focal_plane]
 
     rays = intersect_plane(rays, rays_to_field_z, ri_in=prop_ri, refract=False)
 
@@ -2128,8 +2137,10 @@ def raytrace_to_field(results: dict,
                   optical_train=results["optical_train"],
                   planes_of_interest={"rays -> field":rays_to_field_z,
                                       "paraxial fp":results["paraxial_focal_plane"],
-                                      "midpoint fp":results["midpoint_focal_plane"]},
+                                      "midpoint fp":results["midpoint_focal_plane"],
+                                      "marginal fp":results["marginal_focal_plane"]},
                   show_focal_planes=True,
+                  show_legend=True,
                   title=f"Raytracing {label:s}",
                   figsize=(40,10),
                   save_path= savedir / Path(f"ray_tracing_{label:s}.png"),
