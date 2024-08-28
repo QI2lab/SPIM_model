@@ -6,7 +6,6 @@ Steven Sheppard
 2024/04/24
 """
 import model_tools.propagation as pt
-
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
@@ -1519,7 +1518,7 @@ def get_ray_wf(rays: np.ndarray,
 
     if method == "opld":
         wf = opl - opl[0]
-    elif method == "opl":
+    else:
         wf = opl
 
     return rho, wf
@@ -1718,7 +1717,9 @@ def ray_opl_analysis(pupil_rays: np.ndarray,
                      fit_method: str = "opld",
                      units: str = "",
                      wl: float = 0.0005,
-                     dist_to_focus = None):
+                     dist_to_focus: float = None,
+                     plot_results: bool = False,
+                     save_path: Path = None):
     """
     Return wavefront polynomial fit, calculate Strehl ratio and RMS over normalized radial grid.
     Helper function for calling wavefront analysis tools
@@ -1747,89 +1748,20 @@ def ray_opl_analysis(pupil_rays: np.ndarray,
     return results_dict
 
 
-def ray_opl_strehl_with_amp(pupil_rays,
-                            ko,
-                            pupil_radius,
-                            binning="doane",
-                            DEBUG=False):
+def get_zernike_from_fit(fit):
     """
-    TODO: WIP
-    TODO: Update conversion to field amplitude
-
-    Calculate the Strehl ratio by integrating over aberrations in pupil.
-    Born & Wolf pg463.
-
-
-    :param array pupil_rays: Rays in the pupil plane of pupil_obj
-    :param float pupil_radius: lens pupil radius in mm.
-    :param float k: wavenumber, 2pi/wl
+    Convert the polynomial fit coefficients to the zernike mode coeffiecients.
+    Due to the symmetry of the avaiable surfaces and 1d raytracing, there are no angle-dependent aberrations. Hence, we only consider the piston (Z0), focus (Z3) and spherical and focus (Z8) terms.
+ul
+    reference: Eq.(57), https://wp.optics.arizona.edu/jcwyant/wp-content/uploads/sites/13/2016/08/Zernikes.pdf
     """
-    rho, wf = get_ray_wf(pupil_rays, pupil_radius, "opld")
-    wf_fit = ray_opl_polynomial(pupil_rays, pupil_radius, "opld")
-    wf_aberration = wf - wf_fit[0]
-
-    # Get amplitude interpolation
-    # Compute ray density using binning, doane should have uniform bin widths
-    hist, bin_edges = np.histogram(rho,
-                                   bins="doane",
-                                   density=True,
-                                   range=(0,1))
-    bin_centers = bin_edges - (bin_edges[1] - bin_edges[0])/2
-
-    # interpolate field amplitude
-    amp_interp = interp1d(bin_centers[:-1],
-                          hist,
-                          kind="linear",
-                          bounds_error=False,
-                          fill_value=0)
-
-    # interpolate wf aberration
-    wf_aberration_interp = interp1d(rho,
-                                    wf_aberration,
-                                    kind="linear",
-                                    bounds_error=False,
-                                    fill_value=0)
-
-    def analytic_pupil_amplitude(r):
-        """
-        :param float rho: normalized radius
-        """
-        sigma = 1/4
-        amplitude = amp_interp(0)*np.exp(-r**2/sigma**2)
-        return amplitude
-
-    def strehl_integrand(r, ko):
-        return r * ((amp_interp(r)/analytic_pupil_amplitude(r))
-                    * np.exp(1j*ko*(wf_aberration_interp(r)))
-                    )
-
-    def real_strehl(x, ko):
-        return np.real(strehl_integrand(x, ko))
-
-    def imag_strehl(x, ko):
-        return np.imag(strehl_integrand(x, ko))
-
-    try:
-        # integrate real and imag parts seperately
-        real_integral = quad(real_strehl,
-                             a=0,
-                             b=1,
-                             args=ko,
-                             limit=2000,
-                             full_output=1)
-        imag_integral = quad(imag_strehl,
-                             a=0,
-                             b=1,
-                             args=ko,
-                             limit=2000,
-                             full_output=1)
-    except:
-        strehl = np.nan
-    else:
-        strehl = 4*np.abs(real_integral[0] + 1j*imag_integral[0])**2
-
-    return strehl
-
+    # Compile Zernike angle-independent mode coefficients
+    z24 = fit[8] / 70
+    z15 = (fit[6] + 2*fit[8]) / 20
+    z8 = (fit[4] + 30*z15 - 90*z24) / 6
+    z3 = fit[2] + 6*z8 - 12*z15 + 20*z24
+    z0 = fit[0] + z3 - z8 + z15 - z24
+    return [z0, z3, z8, z15, z24]
 
 #%% Rays to field
 def rays_to_field(mask_radius: np.ndarray,
@@ -1884,7 +1816,7 @@ def rays_to_field(mask_radius: np.ndarray,
         elif phase_type=="opld":
             # Difference with respect to mean path travelled.
             phase_interp = interp1d(last_rays[:, 0][keep_idx],
-                                    last_rays[:, 3][keep_idx] - np.nanmean(last_rays[:, 3]),
+                                    last_rays[:, 3][keep_idx] - np.nanmean(last_rays[:,3]),
                                     kind="linear",
                                     bounds_error=False,
                                     fill_value=0
@@ -1933,21 +1865,23 @@ def rays_to_field(mask_radius: np.ndarray,
     # Optional, normalize to given power
     if amp_type=="power" and (results=="field" or results=="amplitude"):
         n_grid = mask_radius.shape[0]
-        dx = mask_radius[int(n_grid//2),int(n_grid//2 + 1)] - mask_radius[int(n_grid//2), int(n_grid//2)]
+        dx =(mask_radius[int(n_grid//2),int(n_grid//2 + 1)]
+             - mask_radius[int(n_grid//2), int(n_grid//2)])
         field = pt.normalize_field(field, power, dx)
 
     if plot_field:
         # Define custom colormap symmetric about black
-        cdict = {'red':[(0.0, 0.0, 0.0),
+        cdict = {'blue':  [(0.0, 1.0, 1.0),
+                            (0.5, 0.0, 0.0),
+                            (1.0, 0.0, 0.0)],
+                'red':[(0.0, 0.0, 0.0),
                         (0.5, 0.0, 0.0),
                         (1.0, 1.0, 1.0)],
-                 'green':[(0.0, 0.0, 0.0),
-                          (0.5, 0.0, 0.0),
-                          (1.0, 0.0, 0.0)],
-                 'blue':  [(0.0, 1.0, 1.0),
-                           (0.5, 0.0, 0.0),
-                           (1.0, 0.0, 0.0)]
-                 }
+                    'green':[(0.0, 0.0, 0.0),
+                            (0.5, 0.0, 0.0),
+                            (1.0, 0.0, 0.0)]
+                    }
+
 
         black_centered_cmap = LinearSegmentedColormap('BlackCentered',
                                                       segmentdata=cdict)
@@ -2022,7 +1956,6 @@ def rays_to_field(mask_radius: np.ndarray,
         ax = fig.add_subplot(grid[1, 1])
         t_str = "$\Delta OPL_{int}(r)$"
         ax.set_title(t_str, fontsize=title_size)
-        # ax.set_ylabel(f"{t_str} (mm)",fontsize=label_size)
         ax.set_xlabel(r"Radius (mm)", fontsize=label_size, labelpad=label_pad)
         ax.plot(radius[::5], phase_interp(radius[::5]), ".m", ms=1)
         ax.tick_params(axis="both",
@@ -2091,6 +2024,10 @@ def raytrace_to_field(results: dict,
     Optionally can plot the raytracing results up to the rays-to-field plane.
 
     """
+    if not savedir:
+        field_path = None
+    else:
+        field_path = savedir / Path(f"initial_field_{label}.png")
     # grab the propagation media RI from results
     prop_ri = results["optical_train"][-1].ri_out
 
@@ -2127,8 +2064,7 @@ def raytrace_to_field(results: dict,
                                   plot_field=plot_rays_to_field,
                                   title=(f"Rays to Field, ",
                                          f"dz to focus:{dist_to_focus:.3f}"),
-                                  save_path=savedir / Path(
-                                      f"initial_field_{label}.png"),
+                                  save_path=field_path,
                                   showfig=showfig)
 
     if plot_raytrace_results:
@@ -2620,163 +2556,6 @@ def plot_ot_aberration(optical_trains: list,
     else: plt.close(fig)
 
 
-def plot_rays_to_field(rays: np.ndarray,
-                       mask_radius: np.ndarray,
-                       extent_xy: list,
-                       ko: float,
-                       binning: str="doane",
-                       phase_type: str="opld",
-                       amp_type: str="power",
-                       power: float=1.0,
-                       fig_title: str="Rays to field",
-                       savedir: Path=None,
-                       showfig: bool=False):
-    """
-    Plot the sequence from initial ray / final amplitude distributions, wave aberration, and phase angle.
-
-    :param array rays: Rays like array
-    :param array mask_radius: n_xy X n_xy array of field radius
-    :param list extent_xy: imshow() extent for field plot
-    :param float ko: Field wave number
-    :param float ko: Wave vector magnitude.
-    :param str binning: Amplitude histogram bin arguement, use "doane" for gaussian or n_xy for generality
-    :param str amp_type: Choose amplitude normalization
-    :param float scale: Required arg if amp_type=="scale"
-    :param str fig_title: fig.suptitle()
-    :param Path savedir: Optional, choose to save fig by passing save path
-    :param boolean showfig: Optional, choose whether to display figure by calling show()
-    """
-    # rays must have ndim=3, check for single stack of rays to expand dims.
-    if rays.ndim == 2:
-        rays = np.expand_dims(rays, axis=0)
-
-    # Drop any nan rays
-    nan_mask = np.logical_not(np.isnan(rays[-1, :, 0]))
-    last_rays = rays[-1, :, :][nan_mask]
-
-    # Only keep the unique radii and opls to avoid interpolation errors
-    radius, keep_idx = np.unique(last_rays[:, 0], return_index=True)
-
-    # Calculate electric field phase
-    if phase_type=="opl":
-        phase_interp = interp1d(last_rays[:, 0][keep_idx],
-                                last_rays[:, 3][keep_idx],
-                                kind="linear",
-                                bounds_error=False,
-                                fill_value=0)
-    elif phase_type=="opld":
-        phase_interp = interp1d(last_rays[:, 0][keep_idx],
-                                last_rays[:, 3][keep_idx]-last_rays[len(last_rays)//2, 3],
-                                kind="linear",
-                                bounds_error=False,
-                                fill_value=0)
-
-    phase = phase_interp(mask_radius)*ko
-
-    # Calculate electric field amplitude
-    # Use binning to calculate PDF, oversample range
-    hist, bin_edges = np.histogram(radius,
-                                   bins=binning,
-                                   range=(-1.2*mask_radius.max(),
-                                          1.2*mask_radius.max()),
-                                   density=True)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:])/2
-
-    # Interpolate field amplitude
-    flux_interp = interp1d(bin_centers,
-                          hist,
-                          kind="linear",
-                          bounds_error=False,
-                          fill_value=0)
-
-    amp = flux_interp(mask_radius)
-
-    # Calculate field
-    field = amp*np.exp(1j*phase)
-
-    # Optional, normalize to given power
-    if amp_type=="power":
-        n_grid = mask_radius.shape[0]
-        dx =( mask_radius[int(n_grid//2), int(n_grid//2 + 1)]
-             - mask_radius[int(n_grid//2), int(n_grid//2)])
-        field = pt.normalize_field(field, power, dx)
-
-    # Plotting
-    fig = plt.figure(figsize=(10, 6))
-    grid = fig.add_gridspec(nrows=3,
-                            ncols=3,
-                            width_ratios=[1, 1, 0.075],
-                            height_ratios=[1, 0.05, 1],
-                            wspace=0.1,
-                            hspace=0.2)
-    fig.suptitle(fig_title)
-
-    # Plot amplitude histogram
-    ax = fig.add_subplot(grid[0, 0])
-    ax.set_title("Radial PDF", fontsize=12)
-    ax.set_ylabel(r"A.U.", fontsize=10)
-    # ax.set_xlim(0, np.max(radius))
-    # ax.plot(bin_centers, hist, ".m", ms=1)
-    ax.hist(bin_centers, hist)
-
-    # Plot field amplitude
-    ax = fig.add_subplot(grid[0, 1])
-    ax.set_title("Field Intensity", fontsize=12)
-    ax.set_ylabel(r"y (mm)", fontsize=10)
-    # ax.set_xlabel(r"x ($\mu m$)", fontsize=10)
-    ax.yaxis.set_major_locator(MaxNLocator(3))
-    ax.xaxis.set_major_locator(MaxNLocator(3))
-    im = ax.imshow(np.abs(field)**2,
-                   cmap="hot",
-                   norm=PowerNorm(gamma=0.7),
-                   extent=extent_xy,
-                   origin="lower",
-                   interpolation=None)
-
-    # Cbar axes
-    cax = fig.add_subplot(grid[0, 2])
-    cbar = plt.colorbar(im, cax=cax)
-    cbar.ax.set_ylabel("A.U.", rotation="horizontal", labelpad=18)
-
-    # Plot wavefront
-    ax = fig.add_subplot(grid[2, 0])
-    ax.set_title("Field wavefront aberration", fontsize=12)
-    ax.set_ylabel(r"$\Delta \phi$ $(mm)$",fontsize=10)
-    ax.set_xlabel(r"Radius $(mm)$", fontsize=10)
-    # ax.set_xlim(0, np.max(radius))
-    ax.plot(last_rays[:, 0][keep_idx], last_rays[:, 3][keep_idx], "-m")
-
-    # Plot phase angle
-    ax = fig.add_subplot(grid[2, 1])
-    ax.set_title("Field phase angle", fontsize=12)
-    ax.set_ylabel(r"y ($mm$)", fontsize=10)
-    ax.set_xlabel(r"x ($mm$)", fontsize=10)
-    ax.yaxis.set_major_locator(MaxNLocator(3))
-    ax.xaxis.set_major_locator(MaxNLocator(3))
-    im = ax.imshow(np.angle(field),
-                   cmap="hot",
-                   vmin=-np.pi,
-                   vmax=np.pi,
-                   extent=extent_xy,
-                   origin="lower",
-                   aspect="equal",
-                   interpolation=None)
-
-    # Cbar axes
-    cax = fig.add_subplot(grid[2, 2])
-    cbar = plt.colorbar(im, cax=cax)
-    cbar.ax.set_ylabel("A.U.", rotation="horizontal", labelpad=12)
-
-    if savedir:
-        plt.savefig(savedir, dpi=150)
-
-    if showfig:
-        plt.show()
-    else: plt.close("all")
-
-    return None
-
-
 def plot_radial_distribution(rays: np.ndarray,
                              binning: str = "doane",
                              title: str = "Ray Distribution",
@@ -2818,8 +2597,7 @@ def plot_radial_distribution(rays: np.ndarray,
 
 
 def plot_fit_summary(fit: np.ndarray,
-                     axes_title: str="Fit Results",
-                     wl: float=None,
+                     fig_title: str="Fit Results",
                      save_path: Path=None,
                      showfig: bool=False):
     """
@@ -2832,31 +2610,112 @@ def plot_fit_summary(fit: np.ndarray,
     :param Path savedir: Optional, choose to save fig by passing save path
     :param boolean showfig: Optional, choose whether to display figure by calling show()
     """
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6), tight_layout=True)
-    fig.suptitle("Fit Summary")
+    # Create figure
+    fig = plt.figure(figsize=(8, 3.5))
+    fig.suptitle(fig_title, fontsize=13)
+
+    grid = fig.add_gridspec(nrows=1,
+                            ncols=6,
+                            width_ratios=[0.5,0.1,0.5,0.1,1,0.075],
+                            wspace=0.05,
+                            hspace=0.05)
+
+    bar_heights = 0.5
+    # Plot a bar plot of the fit results
+    ax = fig.add_subplot(grid[0])
+    ax.set_title("Polynomial CoefF.")
+
     fit_labels = [f"$C_{ii}$" for ii in range(len(fit))]
 
-    if wl:
-        scaled_fit = fit / wl
-        ax.bar((np.arange(len(fit))), scaled_fit, tick_label=fit_labels)
-        ax.set_ylabel(r"$\frac{|C_i|}{\lambda}$",
-                      labelpad=30,
-                      rotation="horizontal")
-        ax.set_xlabel("Fit Coeff", labelpad=10, rotation="horizontal")
+    # Separate positive and negative fit values for coloring
+    colors = ['red' if coeff < 0 else 'blue' for coeff in fit]
+    magnitudes = np.abs(fit)
 
-    else:
-        ax.set_ylabel(r"$|C_i|$")
-        ax.bar((np.arange(len(fit))), fit, tick_label=fit_labels)
-        ax.set_ylabel(r"$|C_i]$", labelpad=10, rotation="horizontal")
-        ax.set_xlabel("Fit Coeff", labelpad=10, rotation="horizontal")
+    ax.barh(np.arange(len(fit)), magnitudes, tick_label=fit_labels, color=colors, height=bar_heights)
+    ax.set_xlabel(r"$|C_i|$", labelpad=5, rotation="horizontal", fontsize=12)
+    # ax.set_ylabel("Fit Coeff", labelpad=28, rotation="horizontal", fontsize=12)
 
-    ax.tick_params("both")
-    ax.set_title(axes_title)
-    if fit[0]/10 > np.sum(fit[1:]):
-        ax.set_yscale("log")
+    ax.tick_params("both", labelsize=11)
+    ax.set_xscale("log")
+    ax.set_xlim(left=1e-8)
+
+    # Plot a bar plot of the fit results
+    ax = fig.add_subplot(grid[2])
+    ax.set_title("Zernike Coeff.")
+
+    zern_labels = [r"$Z_0$",r"$Z_3$",r"$Z_8$", r"$Z_{15}$", r"$Z_{24}$"]
+    zernikes = get_zernike_from_fit(fit)
+
+    # Separate positive and negative fit values for coloring
+    colors = ['red' if coeff < 0 else 'blue' for coeff in zernikes]
+    magnitudes = np.abs(zernikes)
+
+    ax.barh(np.arange(len(zernikes)), magnitudes, tick_label=zern_labels, color=colors, height=bar_heights*(3/8))
+    ax.set_xlabel(r"$|Z_i|$", labelpad=5, rotation="horizontal", fontsize=12)
+    # ax.set_ylabel("Fit Coeff", labelpad=28, rotation="horizontal", fontsize=12)
+
+    ax.tick_params("both", labelsize=11)
+    ax.set_xscale("log")
+    # ax.set_xlim(left=1e-8)
+
+
+    # plot the wavefront using fit coeffiecients
+    ax = fig.add_subplot(grid[4])
+    ax.set_title("Field Phase")
+    # Define custom colormap symmetric about black
+    cdict = {'blue':  [(0.0, 1.0, 1.0),
+                        (0.5, 0.0, 0.0),
+                        (1.0, 0.0, 0.0)],
+             'red':[(0.0, 0.0, 0.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 1.0, 1.0)],
+                'green':[(0.0, 0.0, 0.0),
+                        (0.5, 0.0, 0.0),
+                        (1.0, 0.0, 0.0)]
+                }
+
+    black_centered_cmap = LinearSegmentedColormap('BlackCentered',
+                                                    segmentdata=cdict)
+
+    # Define the wavefront grid to evaluate on
+    num_xy = 2001
+    dx = 2*np.sqrt(2)/num_xy
+    x, radius_xy, extent_xy = pt.field_grid(num_xy=num_xy, num_zx=1, dx=dx, return_field=False)
+    wf = opl_polynomial(radius_xy,fit)
+
+    # clip at pupil edge
+    wf[radius_xy>1]=0
+
+    # Define maximum for symmetric colorbar
+    abs_max = np.max(np.abs(wf))
+    im = ax.imshow(wf,
+                   cmap=black_centered_cmap,
+                   vmin=-abs_max,
+                   vmax=abs_max,
+                   extent=extent_xy,
+                   aspect="equal",
+                   origin="lower")
+
+    ax.set_xlabel(r"$\rho$", fontsize=12, labelpad=8, rotation="horizontal")
+    ax.set_ylabel(r"$\rho$", fontsize=12, labelpad=5, rotation="horizontal")
+    ax.set_xticks([-1.0, -0.5, 0, 0.5, 1.0])
+    ax.set_yticks([-1.0, -0.5, 0, 0.5, 1.0])
+    ax.tick_params("both", labelsize=11)
+
+    # Cbar axes
+    cax = fig.add_subplot(grid[5])
+    cbar = plt.colorbar(im, cax=cax)
+    cbar.ax.set_ylabel("OPL(mm)", rotation="horizontal", labelpad=25, fontsize=12)
+
+    # Adjust the layout to align all elements properly
+    # ax.get_shared_y_axes().join(ax, cbar.ax)  # Aligns the colorbar with the image
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.80, bottom=0.2, right=0.85, left=0.05)  # Leave space for the title
+    plt.show()
+
+
     if save_path:
-        plt.savefig(save_path, dpi=150)
-
+        fig.savefig(save_path)
     if showfig:
         fig.show()
     else: fig.close()

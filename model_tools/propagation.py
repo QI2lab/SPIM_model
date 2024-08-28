@@ -18,7 +18,7 @@ Plotting functions:
 Steven Sheppard
 '''
 import model_tools.raytrace as rt
-
+from model_tools.analytic_forms import gaussian_intensity_no_offset
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import PowerNorm
@@ -643,6 +643,58 @@ def phase_rms(field_phase: np.ndarray,
     rms = simps(simps((field_phase - np.mean(field_phase))**2, dx=dx), dx=dx)
     return np.sqrt(rms)
 
+
+def get_light_sheet(field: np.ndarray,
+                    x: np.ndarray,
+                    x_max: float = None,
+                    wo: float = 10.00):
+    n_zx = field.shape[0]
+    n_xy = field.shape[1]
+    dx = x[1] - x[0]
+
+    if x_max:
+        # Crop down fields to speed up calculations
+        middle_idx = int(x_max // dx)
+        # enforce odd grid numbers
+        if middle_idx%2 == 0:
+            middle_idx += 1
+        # Update coordinates
+        x = x[n_xy//2-middle_idx:n_xy//2+middle_idx+1]
+        xx, yy = np.meshgrid(x, x)
+
+        # Crop down fields before performing operations
+        field = field[:,
+                        n_xy//2-middle_idx:n_xy//2+middle_idx+1,
+                        n_xy//2-middle_idx:n_xy//2+middle_idx+1]
+    else:
+        middle_idx = n_xy // 2
+        # enforce odd grid numbers
+        if middle_idx%2 == 0:
+            middle_idx += 1
+        xx, yy = np.meshgrid(x, x)
+
+    eval_radius = np.sqrt((xx*np.sqrt(2))**2
+                           + (yy*np.sqrt(2))**2)
+
+
+    # normalize intensities
+    intensity_f = np.abs(field)**2/np.max(np.abs(field)**2)
+    intensity_s_xy = gaussian_intensity_no_offset(r=eval_radius,
+                                                    w=wo,
+                                                    Io=1.0,
+                                                    mu=0)
+    joint_intensity = np.zeros(intensity_f.shape)
+
+    # evaluate I(r) at different radial coordinates than native data
+    for z_idx in range(n_zx):
+        f_intensity_interp = interp1d(x,
+                                        intensity_f[z_idx, middle_idx, :],
+                                        kind="linear",
+                                        bounds_error=False,
+                                        fill_value=0
+                                        )
+        joint_intensity[z_idx] = np.sqrt(f_intensity_interp(eval_radius))*np.sqrt(intensity_s_xy)
+    return joint_intensity
 
 #------------------------------------------------------------------------------## Plotting functions
 
