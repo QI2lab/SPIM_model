@@ -1,9 +1,12 @@
 """
-Open ETL remote focus optimization results (from generating heatmap).
+Open ETL remote focus optimization results (from generating heatmap)
+and generate the light sheets for specified experimental configurations.
 
-Specify models to generate fields and display for paper figure.
+- Create electric fields
+- Propagate and convert to light sheets
+- Save results to load for figure 5 in paper.
 
-08/20/2024
+08/29/2024
 Steven Sheppard
 """
 # Imports
@@ -26,6 +29,7 @@ def plot_summary(model: np.ndarray,
                     save_path: Path=None,
                     showfig: bool=False):
     """
+    Modified from raytrace.plot_summary to plot light sheet slices
     """
     # Create figure
     fig = plt.figure(figsize=(5.5, 3.0))
@@ -182,24 +186,25 @@ def plot_summary(model: np.ndarray,
     plt.subplots_adjust(top=0.80, bottom=0.2, right=0.85, left=0.05)
     plt.show()
 
-
     if save_path:
         fig.savefig(save_path)
     if showfig:
         fig.show()
     else: fig.close()
 
-data_path = Path(r"/mnt/server1/extFOV/remote_focus_data/20240821_145235_remote_focus_results/0.14NA_in_ri_mismatch_results.npy")
+# Create path for saving results
+data_path = Path(
+    r"/mnt/server1/extFOV/remote_focus_data/20240821_145235_remote_focus_results/models_for_figure.npy"
+    )
 plot_dir = data_path.parent / Path("plots/")
 
+# modify plotting output
 plot_polynomial = True
 plot_light_sheet_slices = True
 
 # Define which model parameters to generate fields and plot raytrace results
 # [cuvette_offset, etl_dpt]
-models = [[35, 4], [35, 10], [35, 16],
-          [25, 4], [25, 10], [25, 16],
-          [15, 4], [15, 10], [15, 16]]
+models = [[35, 4], [35, 10], [35, 16]]
 
 # Define model parameters
 wl = 0.000488
@@ -207,7 +212,7 @@ ko = 2 * np.pi / wl
 dx = wl/2
 dz = 0.002
 x_max = 0.500
-z_max = 0.500
+z_max = 2.500
 x_padding = 0.050
 n_xy = int(x_max // dx)
 n_zx = int(z_max // dz)
@@ -257,7 +262,6 @@ for params in tqdm(models, "Iterating over RF model heatmap", leave=True):
 
 results_list = None
 del results_list
-# TODO come back and get the ETL dpt values for the desired focus shift and set up run_etl_.. to only run those values if and option is selected.
 
 for ii, _r in enumerate(models_to_keep):
     print(f"Completing simulation {ii+1}/{len(models_to_keep)}...", end="\r")
@@ -280,10 +284,17 @@ for ii, _r in enumerate(models_to_keep):
                                          showfig=True)
 
     # plot the fit results:
+    title_str = "".join((f"dc={_r['cuvette_offset']:.2f}mm, ",
+                         f"df={_r['focus_shift']:.2f}mm, ",
+                         f"Strehl={_r['strehl']:.3f}, ",
+                         f"RMS={_r['rms']*1e3:.3f}um"))
+    fig_path = plot_dir / Path("".join((f"wavefront_fit_{_r['cuvette_offset']:.1f}dc_",
+                                        f"{_r['focus_shift']:.1f}df.pdf")))
+
     rt.plot_fit_summary(_r["opl_fit"],
-                        fig_title=f"dc={_r['cuvette_offset']:.2f}mm, df={_r['focus_shift']:.2f}mm, Strehl={_r['strehl']:.3f}, RMS={_r['rms']*1e3:.3f}um",
+                        fig_title=title_str,
                         showfig = True,
-                        save_path=plot_dir / Path(f"wavefront_fit_{_r['cuvette_offset']:.1f}offset_{_r['focus_shift']:.1f}shift.pdf"))
+                        save_path=fig_path)
 
     #---------------------------------------------------------------------#
     print(f"\nGenerating 3d electric fields . . . ")
@@ -386,6 +397,6 @@ pt.plot_xz_projection(fields = [_r["field"] for _r in models_to_keep],
                       field_labels= [f"Cuvette Offset:{_p[0]}, focus shift:{_p[1]}, Strehl: {_r['strehl']:.3f}, RMS: {_r['rms']:.3f}" for _p, _r in zip(models, models_to_keep)],
                       grid_params=[_r["grid_params"] for _r in models_to_keep],
                       x_max=20,
-                      save_path=data_path.parent / Path("projections.png"), showfig=True)
+                      save_path=data_path.parent / Path("projections.pdf"), showfig=True)
 
 print(f"Total runtime: {(time.time() - t_start):.2f} seconds")

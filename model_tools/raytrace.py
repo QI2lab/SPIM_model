@@ -952,7 +952,8 @@ def raytrace_ot(optical_train: list = [],
                 "marginal_focal_plane":fp_marginal,
                 "axial_extent":fp_marginal - fp_paraxial,
                 "optical_train":optical_train,
-                "fit_plane":None}
+                "fit_plane":None,
+                "fit_rays":None}
 
     elif fit_plane=="diffraction":
         # Prepare electric field grid
@@ -1049,7 +1050,8 @@ def raytrace_ot(optical_train: list = [],
                 "strehl":wavefront_results["strehl"],
                 "rms":wavefront_results["rms"],
                 "optical_train":optical_train,
-                "fit_plane":"diffraction"
+                "fit_plane":"diffraction",
+                "fit_rays":fit_rays
                 }
 
     else:
@@ -1063,7 +1065,7 @@ def raytrace_ot(optical_train: list = [],
             focal_plane = fp_marginal
 
         # neative to raytrace backwards from focal plane
-        fit_obj_f = (focal_plane-obj.z1) / lens.ri_out
+        fit_obj_f = -(focal_plane-obj.z1) / lens.ri_out
         fit_obj_z = focal_plane + fit_obj_f*lens.ri_out
 
         fit_obj =  Perfect_lens(z1=fit_obj_z,
@@ -1119,7 +1121,8 @@ def raytrace_ot(optical_train: list = [],
                 "strehl":wavefront_results["strehl"],
                 "rms":wavefront_results["rms"],
                 "optical_train":optical_train,
-                "fit_plane":fit_plane
+                "fit_plane":fit_plane,
+                "fit_rays":fit_rays
                 }
 
 
@@ -1517,7 +1520,7 @@ def get_ray_wf(rays: np.ndarray,
     opl = opl[order]
 
     if method == "opld":
-        wf = opl - opl[0]
+        wf = -(opl - opl[0])
     else:
         wf = opl
 
@@ -1757,11 +1760,12 @@ ul
     """
     # Compile Zernike angle-independent mode coefficients
     z24 = fit[8] / 70
-    z15 = (fit[6] + 2*fit[8]) / 20
+    z15 = (fit[6] + 140*z24) / 20
     z8 = (fit[4] + 30*z15 - 90*z24) / 6
-    z3 = fit[2] + 6*z8 - 12*z15 + 20*z24
+    z3 = (fit[2] + 6*z8 - 12*z15 + 20*z24) / 2
     z0 = fit[0] + z3 - z8 + z15 - z24
     return [z0, z3, z8, z15, z24]
+
 
 #%% Rays to field
 def rays_to_field(mask_radius: np.ndarray,
@@ -1837,6 +1841,8 @@ def rays_to_field(mask_radius: np.ndarray,
             density=True
         elif amp_type=="flux":
             density=False
+        else:
+            density=False
 
         # Use binning to calculate ray flux
         ray_density, bin_edges = np.histogram(radius,
@@ -1871,30 +1877,32 @@ def rays_to_field(mask_radius: np.ndarray,
 
     if plot_field:
         # Define custom colormap symmetric about black
-        cdict = {'blue':  [(0.0, 1.0, 1.0),
-                            (0.5, 0.0, 0.0),
-                            (1.0, 0.0, 0.0)],
-                'red':[(0.0, 0.0, 0.0),
-                        (0.5, 0.0, 0.0),
-                        (1.0, 1.0, 1.0)],
-                    'green':[(0.0, 0.0, 0.0),
-                            (0.5, 0.0, 0.0),
-                            (1.0, 0.0, 0.0)]
-                    }
+        cdict = {
+            'red':   [(0.0, 1.0, 1.0),  # Red at the start (for negative values)
+                    (0.5, 0.0, 0.0),  # Black in the center
+                    (1.0, 0.0, 0.0)], # No red at the end (for positive values)
 
+            'green': [(0.0, 0.0, 0.0),  # No green at the start
+                    (0.5, 0.0, 0.0),  # Still no green in the center (black)
+                    (1.0, 0.0, 0.0)], # No green at the end
+
+            'blue':  [(0.0, 0.0, 0.0),  # No blue at the start (for negative values)
+                    (0.5, 0.0, 0.0),  # Black in the center
+                    (1.0, 1.0, 1.0)]  # Blue at the end (for positive values)
+            }
 
         black_centered_cmap = LinearSegmentedColormap('BlackCentered',
                                                       segmentdata=cdict)
 
         # Plotting
-        fig = plt.figure(figsize=(8.0, 5.0))
+        fig = plt.figure(figsize=(6.75, 4.0))
         fig.suptitle(title, fontsize=16)
         grid = fig.add_gridspec(nrows=2,
-                                ncols=5,
-                                width_ratios=[0.65, 0.65, 0.001, 1, 0.075],
+                                ncols=6,
+                                width_ratios=[0.5,0.15,0.5,0.3,1.0,0.075],
                                 height_ratios=[1, 1],
-                                wspace=0.35,
-                                hspace=0.40)
+                                wspace=0.01,
+                                hspace=0.3)
         label_size = 12
         ticklbl_size = 10
         title_size = 12
@@ -1904,14 +1912,14 @@ def rays_to_field(mask_radius: np.ndarray,
         ax = fig.add_subplot(grid[0, 0])
         ax.set_title("$\phi(r)$", fontsize=title_size)
         ax.set_ylabel(r"# of rays", fontsize=label_size, labelpad=label_pad)
-        ax.plot(bin_centers, ray_density, ".m", ms=1, c="r")
+        ax.plot(bin_centers, ray_density, ".m", ms=1, c="r", rasterized=True)
         ax.tick_params(axis="both", pad=5,
                        labelsize=ticklbl_size, labelbottom=False)
 
         # Plot amplitude
-        ax = fig.add_subplot(grid[0, 1])
+        ax = fig.add_subplot(grid[0, 2])
         ax.set_title("$\phi_{int}(r)$", fontsize=title_size)
-        ax.plot(radius, flux_interp(radius), ".m", ms=1)
+        ax.plot(radius, flux_interp(radius), ".m", ms=1, rasterized=True)
         ax.tick_params(axis="both", labelsize=ticklbl_size,
                        labelbottom=False, labelleft=False)
 
@@ -1921,13 +1929,14 @@ def rays_to_field(mask_radius: np.ndarray,
                      -mask_radius[0,0],
                      mask_radius[0,0]]
 
-        ax_i = fig.add_subplot(grid[0, 3])
+        ax_i = fig.add_subplot(grid[0, 4])
         ax_i.set_title("$I(r)$", fontsize=title_size)
-        ax_i.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
         ax_i.yaxis.set_major_locator(MaxNLocator(3))
         ax_i.xaxis.set_major_locator(MaxNLocator(3))
+        ax_i.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
         ax_i.set_xticks([-0.2, 0.0, 0.2])
-        ax_i.tick_params(axis="both", labelsize=label_size)
+        ax_i.tick_params(axis="both",
+                         labelsize=label_size,labelbottom=False)
         im = ax_i.imshow(np.abs(field)**2/np.max(np.abs(field)**2),
                          cmap="hot",
                          vmin=0,
@@ -1936,7 +1945,7 @@ def rays_to_field(mask_radius: np.ndarray,
                          interpolation=None)
 
         # Cbar axes
-        cax = fig.add_subplot(grid[0, 4])
+        cax = fig.add_subplot(grid[0, 5])
         cbar = plt.colorbar(im, cax=cax)
         cbar.set_ticks([0.0, 0.5, 1.0])
         cbar.ax.set_ylabel("A.U.", rotation="horizontal", labelpad=17, fontsize=12)
@@ -1953,7 +1962,7 @@ def rays_to_field(mask_radius: np.ndarray,
                 "-m")
 
         # Plot phase
-        ax = fig.add_subplot(grid[1, 1])
+        ax = fig.add_subplot(grid[1, 2])
         t_str = "$\Delta OPL_{int}(r)$"
         ax.set_title(t_str, fontsize=title_size)
         ax.set_xlabel(r"Radius (mm)", fontsize=label_size, labelpad=label_pad)
@@ -1963,14 +1972,14 @@ def rays_to_field(mask_radius: np.ndarray,
 
         # Plot 2d phase
         abs_max = np.max(np.abs(phase))
-        ax = fig.add_subplot(grid[1, 3], sharex=ax_i, sharey=ax_i)
+        ax = fig.add_subplot(grid[1, 4], sharex=ax_i, sharey=ax_i)
         ax.set_title("$\Phi(r)$", fontsize=title_size)
-        ax.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
         ax.set_xlabel(r"x (mm)", fontsize=label_size, labelpad=label_pad)
+        ax.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
         ax.yaxis.set_major_locator(MaxNLocator(3))
         ax.xaxis.set_major_locator(MaxNLocator(3))
-        ax.tick_params(axis="both", labelsize=label_size)
-
+        ax.tick_params(axis="both",
+                       labelsize=label_size)
         im = ax.imshow(phase,
                        extent=extent_xy,
                        cmap=black_centered_cmap,
@@ -1981,13 +1990,14 @@ def rays_to_field(mask_radius: np.ndarray,
                        interpolation=None)
 
         # Cbar axes
-        cax = fig.add_subplot(grid[1, 4])
+        cax = fig.add_subplot(grid[1, 5])
         cbar = plt.colorbar(im, cax=cax)
         cbar.ax.set_ylabel("A.U.", rotation="horizontal",
                            labelpad=15, fontsize=12)
 
+        plt.subplots_adjust(left=0.15, right=0.85, top=0.85, bottom=0.15)
         if save_path:
-            plt.savefig(save_path)
+            plt.savefig(save_path, dpi=300)
 
         if showfig:
             plt.show()
@@ -2256,6 +2266,25 @@ def abcd_focal_plane(optical_train: list,
 #-----------------------------------------------------------------------------#
 # %%Plotting functions
 
+# create custom colormap
+cdict = {
+        'red':   [(0.0, 1.0, 1.0),  # Red at the start (for negative values)
+                  (0.5, 0.0, 0.0),  # Black in the center
+                  (1.0, 0.0, 0.0)], # No red at the end (for positive values)
+
+        'green': [(0.0, 0.0, 0.0),  # No green at the start
+                  (0.5, 0.0, 0.0),  # Still no green in the center (black)
+                  (1.0, 0.0, 0.0)], # No green at the end
+
+        'blue':  [(0.0, 0.0, 0.0),  # No blue at the start (for negative values)
+                  (0.5, 0.0, 0.0),  # Black in the center
+                  (1.0, 1.0, 1.0)]  # Blue at the end (for positive values)
+        }
+
+black_centered_cmap = LinearSegmentedColormap('BlackCentered',
+                                              segmentdata=cdict)
+
+
 def plot_rays(rays: np.ndarray,
               n_rays_to_plot: int=31,
               optical_train = None,
@@ -2346,7 +2375,7 @@ def plot_rays(rays: np.ndarray,
 
     if make_new_figure:
         if save_path:
-            fig.savefig(save_path)
+            fig.savefig(save_path, dpi=300)
 
         if showfig:
             fig.show()
@@ -2467,7 +2496,7 @@ def plot_opld(rays: list = [],
     ax.legend()
 
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, dpi=300)
 
     if showfig:
         fig.show()
@@ -2549,7 +2578,7 @@ def plot_ot_aberration(optical_trains: list,
                               cmap=mpl.cm.coolwarm,
                               orientation="vertical")
     if save_path:
-        plt.savefig(save_path, dpi=150)
+        plt.savefig(save_path, dpi=300)
 
     if showfig:
         plt.show()
@@ -2589,7 +2618,7 @@ def plot_radial_distribution(rays: np.ndarray,
     ax.legend(loc=0, fontsize=14)
 
     if save_path:
-        plt.savefig(save_path, dpi=150)
+        plt.savefig(save_path, dpi=300)
 
     if showfig:
         plt.show()
@@ -2611,7 +2640,7 @@ def plot_fit_summary(fit: np.ndarray,
     :param boolean showfig: Optional, choose whether to display figure by calling show()
     """
     # Create figure
-    fig = plt.figure(figsize=(8, 3.5))
+    fig = plt.figure(figsize=(8.25, 4.0))
     fig.suptitle(fig_title, fontsize=13)
 
     grid = fig.add_gridspec(nrows=1,
@@ -2619,63 +2648,45 @@ def plot_fit_summary(fit: np.ndarray,
                             width_ratios=[0.5,0.1,0.5,0.1,1,0.075],
                             wspace=0.05,
                             hspace=0.05)
-
     bar_heights = 0.5
-    # Plot a bar plot of the fit results
+
+    # Plot a bar plot of the fit results using the polynomial coeff.
     ax = fig.add_subplot(grid[0])
     ax.set_title("Polynomial CoefF.")
 
     fit_labels = [f"$C_{ii}$" for ii in range(len(fit))]
-
-    # Separate positive and negative fit values for coloring
-    colors = ['red' if coeff < 0 else 'blue' for coeff in fit]
-    magnitudes = np.abs(fit)
-
-    ax.barh(np.arange(len(fit)), magnitudes, tick_label=fit_labels, color=colors, height=bar_heights)
+    ax.axvline(x=0, c='k')
+    ax.barh(np.arange(len(fit)),
+            fit,
+            tick_label=fit_labels,
+            color="b",
+            height=bar_heights)
+    ax.set_xlabel(r"$Z_i$", labelpad=5, rotation="horizontal", fontsize=11)
+    ax.tick_params("both", labelsize=10)
     ax.set_xlabel(r"$|C_i|$", labelpad=5, rotation="horizontal", fontsize=12)
-    # ax.set_ylabel("Fit Coeff", labelpad=28, rotation="horizontal", fontsize=12)
 
     ax.tick_params("both", labelsize=11)
-    ax.set_xscale("log")
-    ax.set_xlim(left=1e-8)
 
-    # Plot a bar plot of the fit results
+    # Plot a bar plot of the fit results using Zernike convention
     ax = fig.add_subplot(grid[2])
     ax.set_title("Zernike Coeff.")
 
     zern_labels = [r"$Z_0$",r"$Z_3$",r"$Z_8$", r"$Z_{15}$", r"$Z_{24}$"]
     zernikes = get_zernike_from_fit(fit)
-
-    # Separate positive and negative fit values for coloring
-    colors = ['red' if coeff < 0 else 'blue' for coeff in zernikes]
-    magnitudes = np.abs(zernikes)
-
-    ax.barh(np.arange(len(zernikes)), magnitudes, tick_label=zern_labels, color=colors, height=bar_heights*(3/8))
-    ax.set_xlabel(r"$|Z_i|$", labelpad=5, rotation="horizontal", fontsize=12)
-    # ax.set_ylabel("Fit Coeff", labelpad=28, rotation="horizontal", fontsize=12)
+    ax.axvline(x=0, c='k')
+    ax.barh(np.arange(len(zernikes)),
+            zernikes,
+            tick_label=zern_labels,
+            color="b",
+            height=bar_heights*(5/8))
+    ax.set_xlabel(r"$Z_i$", labelpad=5, rotation="horizontal", fontsize=11)
+    ax.tick_params("both", labelsize=10)
 
     ax.tick_params("both", labelsize=11)
-    ax.set_xscale("log")
-    # ax.set_xlim(left=1e-8)
-
 
     # plot the wavefront using fit coeffiecients
     ax = fig.add_subplot(grid[4])
     ax.set_title("Field Phase")
-    # Define custom colormap symmetric about black
-    cdict = {'blue':  [(0.0, 1.0, 1.0),
-                        (0.5, 0.0, 0.0),
-                        (1.0, 0.0, 0.0)],
-             'red':[(0.0, 0.0, 0.0),
-                    (0.5, 0.0, 0.0),
-                    (1.0, 1.0, 1.0)],
-                'green':[(0.0, 0.0, 0.0),
-                        (0.5, 0.0, 0.0),
-                        (1.0, 0.0, 0.0)]
-                }
-
-    black_centered_cmap = LinearSegmentedColormap('BlackCentered',
-                                                    segmentdata=cdict)
 
     # Define the wavefront grid to evaluate on
     num_xy = 2001
@@ -2697,7 +2708,6 @@ def plot_fit_summary(fit: np.ndarray,
                    origin="lower")
 
     ax.set_xlabel(r"$\rho$", fontsize=12, labelpad=8, rotation="horizontal")
-    ax.set_ylabel(r"$\rho$", fontsize=12, labelpad=5, rotation="horizontal")
     ax.set_xticks([-1.0, -0.5, 0, 0.5, 1.0])
     ax.set_yticks([-1.0, -0.5, 0, 0.5, 1.0])
     ax.tick_params("both", labelsize=11)
@@ -2705,20 +2715,17 @@ def plot_fit_summary(fit: np.ndarray,
     # Cbar axes
     cax = fig.add_subplot(grid[5])
     cbar = plt.colorbar(im, cax=cax)
-    cbar.ax.set_ylabel("OPL(mm)", rotation="horizontal", labelpad=25, fontsize=12)
+    cbar.ax.set_ylabel("OPL(mm)", rotation="vertical", labelpad=5, fontsize=12)
 
     # Adjust the layout to align all elements properly
-    # ax.get_shared_y_axes().join(ax, cbar.ax)  # Aligns the colorbar with the image
     plt.tight_layout()
-    plt.subplots_adjust(top=0.80, bottom=0.2, right=0.85, left=0.05)  # Leave space for the title
-    plt.show()
-
+    plt.subplots_adjust(top=0.85, bottom=0.2, right=0.92, left=0.05)
 
     if save_path:
-        fig.savefig(save_path)
+        fig.savefig(save_path, dpi=300)
     if showfig:
         fig.show()
-    else: fig.close()
+    else: plt.close(fig)
 
 
 #-----------------------------------------------------------------------------#

@@ -4,3 +4,6 @@
 # ignore vscode directories
 *.code-workspace
 .vscode
+
+# ignore data directories
+data/

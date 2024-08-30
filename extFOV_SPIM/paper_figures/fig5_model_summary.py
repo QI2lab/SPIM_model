@@ -1,4 +1,8 @@
+"""
 
+Made ....
+
+"""
 # Imports
 import model_tools.raytrace as rt
 import model_tools.propagation as pt
@@ -12,6 +16,25 @@ from tqdm import tqdm
 zern_max = 1e-2
 zern_min = 1e-8
 phase_max = 40e-5
+
+# Define custom colormap symmetric about black
+cdict = {
+        'red':   [(0.0, 1.0, 1.0),  # Red at the start (for negative values)
+                  (0.5, 0.0, 0.0),  # Black in the center
+                  (1.0, 0.0, 0.0)], # No red at the end (for positive values)
+
+        'green': [(0.0, 0.0, 0.0),  # No green at the start
+                  (0.5, 0.0, 0.0),  # Still no green in the center (black)
+                  (1.0, 0.0, 0.0)], # No green at the end
+
+        'blue':  [(0.0, 0.0, 0.0),  # No blue at the start (for negative values)
+                  (0.5, 0.0, 0.0),  # Black in the center
+                  (1.0, 1.0, 1.0)]  # Blue at the end (for positive values)
+        }
+
+black_centered_cmap = LinearSegmentedColormap('BlackCentered',
+                                              segmentdata=cdict)
+
 
 # Define a method for generating the figure plots
 def plot_summary(model: np.ndarray,
@@ -31,7 +54,7 @@ def plot_summary(model: np.ndarray,
 
     # Plot a bar plot of the fit results
     ax = fig.add_subplot(grid[0])
-    fit = model["opl_fit"]
+    fit = model["opl_fit"] * -1  # Accountign for sign convention...
     bar_heights = 0.5
 
     # ax.set_title("Zernike Coeff.")
@@ -58,24 +81,6 @@ def plot_summary(model: np.ndarray,
 
     # plot the wavefront using fit coeffiecients
     ax = fig.add_subplot(grid[2])
-    # ax.set_title("Field Phase")
-    # Define custom colormap symmetric about black
-    cdict = {
-            'red':   [(0.0, 1.0, 1.0),  # Red at the start (for negative values)
-                    (0.5, 0.0, 0.0),  # Black in the center
-                    (1.0, 0.0, 0.0)], # No red at the end (for positive values)
-
-            'green': [(0.0, 0.0, 0.0),  # No green at the start
-                    (0.5, 0.0, 0.0),  # Still no green in the center (black)
-                    (1.0, 0.0, 0.0)], # No green at the end
-
-            'blue':  [(0.0, 0.0, 0.0),  # No blue at the start (for negative values)
-                    (0.5, 0.0, 0.0),  # Black in the center
-                    (1.0, 1.0, 1.0)]  # Blue at the end (for positive values)
-            }
-
-    black_centered_cmap = LinearSegmentedColormap('BlackCentered',
-                                                    segmentdata=cdict)
 
     # Define the wavefront grid to evaluate on
     num_xy = 2001
@@ -92,7 +97,7 @@ def plot_summary(model: np.ndarray,
     tick_labels = ["-5e-4","-2e-4", "-1e-5", "1e-5", "2e-4","5e-4"]
     tick_values = [np.abs(float(tl))**gamma*np.sign(float(tl)) for tl in tick_labels]
     wf_max = np.max(tick_values)
-    print(tick_labels, tick_values)
+
     im = ax.imshow(np.abs(wf)**gamma*np.sign(wf),
                    cmap=black_centered_cmap,
                    vmin=-wf_max,
@@ -176,18 +181,19 @@ def plot_summary(model: np.ndarray,
     else: plt.close()
 
 
-data_path = Path(
+model_path = Path(
     r"/mnt/server1/extFOV/remote_focus_data/20240821_145235_remote_focus_results/models_for_figure.npy"
     )
 
-# # load list of result_dicts
-# print("Opening selected heatmap results . . .")
-# tl_start = time.time()
-# models = np.load(data_path, allow_pickle=True)
-# print(f"Loading data takes: {(time.time() - tl_start):.2f} seconds")
+print("Opening selected heatmap results . . .")
+tl_start = time.time()
+models = np.load(model_path, allow_pickle=True)
+print(f"Loading data takes: {(time.time() - tl_start):.2f} seconds")
 
 
 for _r in tqdm(models[:3], desc="Generating wavefront summaries"):
+    print(_r.keys())
+    print(f"df={_r['focus_shift']:.2f}, dc={_r['focus_shift']:.2f}, \nFit:{_r['opl_fit']}, \nZernikes: {rt.get_zernike_from_fit(_r['opl_fit'])}")
     plot_summary(_r,
-                 data_path.parent / Path("plots/") / Path(f"summary_{_r['cuvette_offset']:.2f}mm_ df{_r['focus_shift']:.2f}mm.pdf"),
+                 model_path.parent / Path("plots/") / Path(f"summary_{_r['cuvette_offset']:.2f}mm_ df{_r['focus_shift']:.2f}mm.pdf"),
                  showfig=True)

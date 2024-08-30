@@ -30,20 +30,28 @@ if __name__ == '__main__':
     run_mitu = True
     run_nikon = False
     fig_version = True
-    run_in_parallel = False
+    run_in_parallel = True
+    n_rays = 3e6
+    num_samples = 31
+    save_name = "models_for_figure"
+    save_data = True
 
-    # root_dir = Path("C:\Users\Steven\Documents\qi2lab\github\SPIM_model\data")
+    # Setup directories
     root_dir = Path("/mnt/server1/extFOV/remote_focus_data")
     savedir_path = rt.get_unique_dir(root_dir, "remote_focus_results")
     plots_dir = savedir_path / Path("plots")
     plots_dir.mkdir(exist_ok=True)
 
-    # Calculate focal shift with respect to:
-    #   "cuv" (last cuvette surface, exp.)
-    #   "native" (0 dpt focal plane)
-    #   "dpt" (show etl dpts instead of focal shift)
+
+    """
+    Calculate focal shift with respect to:
+      "cuv" (last cuvette surface, exp.)
+      "native" (0 dpt focal plane)
+      "dpt" (show etl dpts instead of focal shift)
+    """
     focus_shift_plane = "cuv"
-    num_samples = 51
+
+    # Setup figure constraints
     grid_widths = [0.85, 0.1, 0.5, 0.85, 0.1]
     trans_max = 50
     axial_max = 300
@@ -51,9 +59,9 @@ if __name__ == '__main__':
     axial_yticks = [10, 25, 35]
     axial_cbar_ticks = [-200, -50, 50, 200]
     trans_cbar_ticks = [0, 10, 20]
-    axes_label_ftsize = 10
-    axes_tick_ftsize = 8
-    figsize = (3.0, 1.5)
+    axes_label_ftsize = 12
+    axes_tick_ftsize = 10
+    figsize = (3.75, 1.8)
 
     #------------------------------------------------------------------------------#
     # Define model parameters
@@ -61,7 +69,7 @@ if __name__ == '__main__':
     # Create set of rays to use for simulations
     rays_params = {"type":"flat_top",
                 "source":"infinity",
-                "n_rays":2e6,
+                "n_rays":n_rays,
                 "diameter":18,
                 "wl":0.000488}
 
@@ -77,15 +85,16 @@ if __name__ == '__main__':
     etl_dpt_min = -10
     etl_dpt_max = 10
 
-    # How lens Doublet lens parameters are defined.
-    # _params = [z1,
-    #            r1, t1, ri1,
-    #            r2, t2, ri2,
-    #            r3,
-    #            aperture_radius,
-    #            ri_in, ri_out,
-    #            type]
-
+    """
+    How lens Doublet lens parameters are defined.
+    _params = [z1,
+               r1, t1, ri1,
+               r2, t2, ri2,
+               r3,
+               aperture_radius,
+               ri_in, ri_out,
+               type]
+    """
     # Define relay lens 1 parameters
     relay1_lens_params = [0,
                         109.7, 12.0, 1.5180,
@@ -169,7 +178,6 @@ if __name__ == '__main__':
     #------------------------------------------------------------------------------#
     # Method for running simulations
     #------------------------------------------------------------------------------#
-    # freeze_support()
 
     def model_illumination_pathway(exc_obj,
                                 dpt: float = 0,
@@ -232,7 +240,7 @@ if __name__ == '__main__':
         # ray trace and calculate focal extent for the optical train of interest
         _r = rt.raytrace_ot(optical_train=illumation_pathway,
                             rays=initial_rays.copy(),
-                            fit_plane="midpoint",
+                            fit_plane="paraxial",
                             return_rays="all",
                             plot_raytrace_results=False,
                             save_path=plots_dir / Path(f"{dpt:.2f}dpt_{cuvette_offset:.2f}offset.png")
@@ -240,15 +248,16 @@ if __name__ == '__main__':
 
         # Calculate the ray tracing focal extent
         rays = rt.intersect_plane(_r["rays"],
-                                _r["midpoint_focal_plane"],
-                                ri_in=immersion_ri,
-                                refract=False
-                                )
+                                  _r["midpoint_focal_plane"],
+                                  ri_in=immersion_ri,
+                                  refract=False
+                                  )
+
 
         # Calculate the focal extent and shift
         _r["transverse_extent"] = np.abs((np.nanmax(rays[-1, :, 0])
                                         - np.nanmin(rays[-1, :, 0])))
-        _r["axial_extent"] = _r["marginal_focal_plane"] - _r["paraxial_focal_plane"]
+        _r["axial_extent"] = _r["paraxial_focal_plane"] -_r["marginal_focal_plane"]
         _r["cuvette_offset"] = cuvette_offset
         _r["etl_dpt"] = dpt
         _r["label"] = f"Cuvette Offset = {cuvette_offset}, ETL power: {dpt} diopters"
@@ -275,17 +284,10 @@ if __name__ == '__main__':
         return _r
 
 
-    def create_heatmap_figure(exc_obj,
-                            num_samples,
-                            fig_shape: tuple = (3.5, 1.75),
-                            axes_label_fontsize: int = 8,
-                            axes_tick_fontsize: int = 8,
-                            axial_max: float = 150,
-                            xlim: float = 10,
-                            cmap_axial: str = "coolwarm",
-                            model_label: str =None,
-                            showfig: bool = True,
-                            final_version: bool = False):
+    def generate_heatmap_data(exc_obj,
+                              num_samples,
+                              model_label: str =None,
+                              savedata:bool = False):
         """
         Simulate illumation pathway using the given excitation objective.
         Run ETL diopters \pm10 and over the physically possible cuvette positions.
@@ -313,18 +315,7 @@ if __name__ == '__main__':
         # Define the ETL diopter and cuvette offset range to run all simulations
         etl_dpt_samples = np.linspace(etl_dpt_min, etl_dpt_max, num_samples)
         cuvette_offsets = np.linspace(0.1, exc_obj.f, num_samples)
-
-        #--------------------------------------------------------------------------#
-        # Create figure to plot results
-        fig = plt.figure(figsize=fig_shape)
-        grid = fig.add_gridspec(nrows=1,
-                                ncols=2,
-                                width_ratios=[1.0,0.2],
-                                wspace=0.2)
-
-        # Create the axial and transvers extent axis
-        ax_axial = fig.add_subplot(grid[0,0])
-        ax_axial_cbar = fig.add_subplot(grid[0,1])
+        cuvette_offsets = np.array([35])
 
         #--------------------------------------------------------------------------#
         # simulate exc_obj over cuvette positions and ETL diopters
@@ -351,52 +342,91 @@ if __name__ == '__main__':
                 for jj, dpt in enumerate(etl_dpt_samples):
                     print(f"Running model: offset{ii+1}/{num_samples} and dpt {jj}/{num_samples}", end="\r")
                     _r.append(model_illumination_pathway(exc_obj=exc_obj,
-                                                        dpt=dpt,
-                                                        cuvette_offset=offset
-                                                        )
-                            )
+                                                         dpt=dpt,
+                                                         cuvette_offset=offset
+                                                         ))
 
         # save results to propagat and plot specific configurations
         if not model_label:
-            model_label = f"{exc_obj.na:.2f}NA_in_ri_mismatch"
-        print(f"Saving model label:{model_label}")
-        np.save(savedir_path / Path(f"{model_label}_results.npy"), _r, allow_pickle=True)
+            model_label = f"{exc_obj.na:.2f}NA_in_ri_mismatch_results"
+
+        if savedata:
+            print(f"Saving model label:{model_label}")
+            np.save(savedir_path / Path(f"{model_label}.npy"), _r, allow_pickle=True)
+
+        return _r
+
+
+    def create_heatmap_figure(results,
+                              exc_obj,
+                             fig_shape: tuple = (3.5, 1.75),
+                             axes_label_fontsize: int = 8,
+                             axes_tick_fontsize: int = 8,
+                             axial_max: float = 150,
+                             xlim: float = 10,
+                             cmap_axial: str = "coolwarm",
+                             showfig: bool = True):
 
         # Compile 1d arrays of results to plot
-        cuv_offsets = np.array([_["cuvette_offset"] for _ in _r])
-        focus_shift = np.array([_["focus_shift"] for _ in _r])
-        axial_extents = np.array([_["axial_extent"]*1e3 for _ in _r])
+        cuv_offsets = np.array([_["cuvette_offset"] for _ in results])
+        focus_shift = np.array([_["focus_shift"] for _ in results])
+        axial_extents = np.array([_["axial_extent"]*1e3 for _ in results])
+        # c4s = np.array([_["opl_fit"][4] for _ in results])
+        # c2s = np.array([_["opl_fit"][2] for _ in results])
+
 
         #--------------------------------------------------------------------------#
-        # Create scatter plots
-        a_scat = ax_axial.scatter(focus_shift,
-                                cuv_offsets,
-                                c=axial_extents,
-                                vmin=-axial_max,
-                                vmax=axial_max,
-                                cmap=cmap_axial,
-                                s=1,
-                                marker='o'
-                                )
+        # Create figure to plot results
+        fig = plt.figure(figsize=fig_shape)
+        grid = fig.add_gridspec(nrows=1,
+                                ncols=2,
+                                width_ratios=[1.0,0.1],
+                                wspace=0.15)
 
+        # Create the axial and transvers extent axis
+        ax = fig.add_subplot(grid[0,0])
+        ax_cbar = fig.add_subplot(grid[0,1])
+        #--------------------------------------------------------------------------#
+
+        # Create scatter plots
+        a_scat = ax.scatter(focus_shift,
+                            cuv_offsets,
+                            c=axial_extents,
+                            vmin=-axial_max,
+                            vmax=axial_max,
+                            cmap=cmap_axial,
+                            s=1,
+                            marker='o'
+                            )
+        # a_scat = ax.scatter(focus_shift,
+        #                     cuv_offsets,
+        #                     c=c4s,
+        #                     vmin=-0.0005,
+        #                     vmax=0.0005,
+        #                     # vmin=-np.max(np.abs(c4s)),
+        #                     # vmax=np.max(np.abs(c4s)),
+        #                     cmap=cmap_axial,
+        #                     s=1,
+        #                     marker='o'
+        #                     )
         # Create colorbars
-        axial_cbar = plt.colorbar(a_scat, cax=ax_axial_cbar)
+        axial_cbar = plt.colorbar(a_scat, cax=ax_cbar)
 
         # setup the axes labels
         if focus_shift_plane == "dpt":
             x_label = "ETL dpt ($m^{-1}$)"
         else:
             x_label = "df (mm)"
-        ax_axial.set_ylabel("dc (mm)", fontsize=axes_label_fontsize)
-        ax_axial.set_xlabel(x_label, fontsize=axes_label_fontsize)
-        axial_cbar.set_label("axial spread\n($\mu m$)",
+        ax.set_ylabel("dc (mm)", fontsize=axes_label_fontsize)
+        ax.set_xlabel(x_label, fontsize=axes_label_fontsize)
+        axial_cbar.set_label("LSA ($\mu m$)",
                             loc="center",
                             fontsize=axes_label_fontsize,
-                            labelpad=-4
+                            labelpad=4
                             )
-        ax_axial_cbar.tick_params(axis="y", labelsize=axes_tick_fontsize)
-        ax_axial.tick_params(axis="both", labelsize=axes_tick_fontsize)
-        ax_axial.set_facecolor('k')
+        ax_cbar.tick_params(axis="y", labelsize=axes_tick_fontsize)
+        ax.tick_params(axis="both", labelsize=axes_tick_fontsize)
+        ax.set_facecolor('k')
 
         # setup the axis limits
         if focus_shift_plane=="dpt":
@@ -405,14 +435,11 @@ if __name__ == '__main__':
             xlims = (0, xlim)
         else:
             xlims = (-xlim, xlim)
-        ax_axial.set_xlim(xlims)
-        ax_axial.set_xticks(np.array([0,10,20]))
+        ax.set_xlim(xlims)
+        ax.set_xticks(np.array([0,10,20]))
+        plt.subplots_adjust(top=0.92, bottom=0.28, right=0.80, left=0.15)
+        fig.savefig(savedir_path / Path(f"{exc_obj.type}_heatmap.pdf"))
 
-        if final_version:
-            fig.savefig(savedir_path / Path(f"{exc_obj.type}_heatmap.pdf"))
-        else:
-            fig.savefig(savedir_path / Path(f"{exc_obj.type}_heatmap.png"),
-                        dpi=300)
 
         if showfig:
             fig.show()
@@ -425,27 +452,31 @@ if __name__ == '__main__':
     # Run simulations
     #------------------------------------------------------------------------------#
     if run_mitu:
-        fig_mitu = create_heatmap_figure(exc_obj=mitutoyo,
-                                        num_samples=num_samples,
-                                        fig_shape=figsize,
-                                        axes_label_fontsize=axes_label_ftsize,
-                                        axes_tick_fontsize=axes_tick_ftsize,
-                                        axial_max=axial_max,
-                                        xlim=xlim,
-                                        cmap_axial="coolwarm",
-                                        showfig=True,
-                                        final_version=fig_version)
-    if run_nikon:
-        fig_nikon = create_heatmap_figure(exc_obj=nikon,
-                                        num_samples=num_samples,
-                                        fig_shape=figsize,
-                                        axes_label_fontsize=axes_label_ftsize,
-                                        axes_tick_fontsize=axes_tick_ftsize,
-                                        axial_max=axial_max,
-                                        xlim=xlim,
-                                        cmap_axial="coolwarm",
-                                        showfig=True,
-                                        final_version=fig_version)
+        mitu_heatmap_data = generate_heatmap_data(mitutoyo, num_samples, save_name, save_data)
+
+        create_heatmap_figure(mitu_heatmap_data,
+                              mitutoyo,
+                              fig_shape=figsize,
+                              axes_label_fontsize=axes_label_ftsize,
+                              axes_tick_fontsize=axes_tick_ftsize,
+                              axial_max=axial_max,
+                              xlim=xlim,
+                              cmap_axial="RdBu",
+                              showfig=True)
+
+
+
+    # if run_nikon:
+    #     fig_nikon = create_heatmap_figure(exc_obj=nikon,
+    #                                     num_samples=num_samples,
+    #                                     fig_shape=figsize,
+    #                                     axes_label_fontsize=axes_label_ftsize,
+    #                                     axes_tick_fontsize=axes_tick_ftsize,
+    #                                     axial_max=axial_max,
+    #                                     xlim=xlim,
+    #                                     cmap_axial="RdBu",
+    #                                     showfig=True,
+    #                                     model_label=save_name)
 
 
     if plot_interactive_results:

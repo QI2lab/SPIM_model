@@ -22,7 +22,7 @@ t_start = time.time()
 result_path = Path(
     r"C:\Users\Steven\Documents\qi2lab\github\SPIM_model\data\paper_results\combined_zstack_results.npy"
     )
-save_dir = Path(r"C:\Users\Steven\Documents\qi2lab\illustrator_files\SPIM_model") #result_path.parent
+save_dir = Path(r"C:\Users\Steven\Documents\qi2lab\illustrator_files\SPIM_model")
 
 #------------------------------------------------------------------------------#
 # Load results.
@@ -30,28 +30,27 @@ print("Loading localization results")
 results = np.load(result_path, allow_pickle=True)
 
 # Preselected dc position for figure
-dcs_to_use = [10, 25, 35]
+dcs_to_use = [35]
 
 # Define experimental parameters
 cuv_pos_to_plot = []
 num_cuv_pos = len(dcs_to_use)
 num_etl_pos = 3
 dxy = 4.25 / 2
+dz = 1.0
 
 #------------------------------------------------------------------------------#
 # Setup figure.
-fig_height = 4.5
-fig_width = 6.
-height_ratios = [1, 0.5, 0.05] * num_cuv_pos
-width_ratios=[1]* num_etl_pos + [0.01, 0.13]
+fig_height = 1.6
+fig_width = 4.25
 row_mapping = [0, 3, 6]
 
 # Create figure.
 figh = plt.figure(figsize=(fig_width, fig_height))
-grid = figh.add_gridspec(nrows=len(height_ratios),
-                         ncols=len(width_ratios),
-                         width_ratios=width_ratios,
-                         height_ratios=height_ratios,
+grid = figh.add_gridspec(nrows=2,
+                         ncols=4,
+                         width_ratios=[1,1,1,0.1],
+                         height_ratios=[1,0.5],
                          hspace=0.1,
                          wspace=0.15)
 
@@ -60,10 +59,8 @@ sz_min = 1
 sz_max = 10
 cmap_color = colormaps.get_cmap("autumn")
 
-
 #------------------------------------------------------------------------------#
 # Iterate through results and plot the bead image and sz results.
-
 row_idx = 0
 for _r in results[::-1]:
     # Dict. keys are the etl volts
@@ -72,7 +69,6 @@ for _r in results[::-1]:
 
     if dc in dcs_to_use:
         pos_ax = row_mapping[row_idx]
-
         #----------------------------------------------------------------------#
         # Loop through ETL volts and plot fig row
         for jj, etl_v in enumerate(etl_pos_keys):
@@ -88,6 +84,7 @@ for _r in results[::-1]:
             img = _r[etl_v]["data"]
             dc = _r[etl_v]["dc"]
 
+            print(f"Coords y:{cy.min()} {cy.max()}")
             # define coords of interest
             fp = np.argmin(sz)
             max_sz = (np.max(sz)-np.min(sz)) * 0.5 + np.min(sz)
@@ -95,7 +92,6 @@ for _r in results[::-1]:
 
             #------------------------------------------------------------------#
             # Plot in the first column + colorbar.
-
             # create axes for image and colorbar
             ax_im = figh.add_subplot(grid[pos_ax, jj])
             ax_sz = figh.add_subplot(grid[pos_ax+1, jj], sharex=ax_im)
@@ -108,60 +104,42 @@ for _r in results[::-1]:
                               bottom=False, left=False,
                               labelbottom=False, labelleft=False)
 
-
-            # Define the image coordinates to show real extent
-            dx = xx[0, 1] - xx[0, 0]
-            dy = yy[1, 0] - yy[0, 0]
-            extent_xy = [yy.max() - 0.5 * dy, yy.min() - 0.5 * dy,
-                         xx.min() - 0.5 * dx, xx.max() - 0.5 * dx]
-
-            #------------------------------------------------------------------#
-            # Plot maximum projection
-            img_max_proj = np.nanmax(img, axis=0)
-            im_min = np.percentile(img_max_proj, 0.01)
-            im_max = np.percentile(img_max_proj, 99.9)
-            im = ax_im.imshow(img_max_proj.T[::-1],
-                                norm=PowerNorm(gamma=0.5, vmin=im_min, vmax=im_max),
-                                cmap="bone",
-                                origin="upper",
-                                extent=extent_xy,
-                                aspect="equal")
-
-            xlim = ax_im.get_xlim()
-            ylim = ax_im.get_ylim()
-
             # Plot bead centers on max projection
             cs = cmap_color((sz - sz_min) / (sz_max - sz_min))
             ax_im.scatter(cy, cx, sz,
                           facecolor='none', edgecolor=cs,
                           marker='o', linewidths=0.5, alpha=0.85)
+            # ax_im.set_aspect(dz / dxy)
+            ax_im.set_facecolor("k")
 
-            # Re-enforce im limits
-            ax_im.set_xlim(xlim)
-            ax_im.set_ylim(ylim)
+            # # Re-enforce im limits
+            ax_im.set_xlim([0, 4800])
 
             #----------------------------------------------------------------------#
+            # plot the bead axial positions and sigma z results.
             # ax_sz.plot(cy, sz_raw, c="r", marker=".", markersize=.5, linestyle="none")
-            ax_sz.plot(cy, sz, c="b", marker=".", markersize=0.85, linestyle="-")
+            ax_sz.plot(cy, sz, c="b", marker=".", markersize=0.5, linestyle="-")
             ax_sz.axvline(x=left, c="k")
             ax_sz.axvline(x=right, c="k")
 
             ax_sz.set_ylim(0,18)
-
+            ax_sz.set_xlim([0, 4800])
 
         row_idx += 1
 
-# # Create colorbar for sz.
+# Create colorbar for sz.
 ax_cbar =  figh.add_subplot(grid[:, -1])
 cbar = plt.colorbar(
     plt.cm.ScalarMappable(norm=Normalize(vmin=sz_min, vmax=sz_max),
                         cmap=cmap_color),
     cax=ax_cbar)
+cbar.set_ticks([2, 4, 6, 8, 10])
 cbar.set_label(r"$\sigma_z$ ($\mu m$)")
-ax_cbar.tick_params("both", labelsize=12)
+ax_cbar.tick_params("both", labelsize=14)
 
-figh.subplots_adjust(left=0.05, right=0.9,
+# Force plot to fit.
+figh.subplots_adjust(left=0.01, right=0.85,
                      top=0.95, bottom=0.05)
 print("Saving updated analysis results . . . ")
 
-figh.savefig(save_dir / Path("figure6.pdf"))
+figh.savefig(save_dir / Path("fig5_beadlocalizations.pdf"))
