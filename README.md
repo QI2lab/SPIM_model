@@ -1,13 +1,13 @@
 # SPIM_model
-Model tools to perform 1d ray tracing and field propagation.
+Tools for performing 1D ray tracing, 3D field propagation, and wavefront analysis.
+
 - Rays are explicitly traced and refracted at each element surface.
-- The field propagation model applies the exact transfer function method (Goodman, pg140).
+- The field propagation model uses the exact transfer function method (Goodman, pg. 140).
+- Includes wavefront fitting and pupil decomposition.
 
 ## Installation
-Model tools can be used by manually importing *raytracing* and *propagation* scripts or by installing as a python package.
-To install as a package use the following code snippet. In order to edit the package after installing, include *-e* option.
+To install the package, use the following code snippet. If you want to edit the package after installing, include the `-e` option.
 
-TODO: Modify package name and update documentation.
 ```
 git clone
 cd SPIM_model
@@ -19,17 +19,15 @@ cd SPIM_model
 pip install -e .
 ```
 ## Intended use
-Ray Tracing and field propagation can be used seperately or combined. The intended workflow is to setup an optical train, raytrace, extract aberrations, propagate and calculate 3-d electric field distribution.
-
+Ray tracing and field propagation can be used separately or combined. The typical workflow involves setting up an optical train, ray tracing, extracting aberrations, propagating, and calculating the 3D electric field distribution. Example code is available in the extFOV_SPIM directory.
 ### Ray Tracing
-Optics are classes and compiled using surface and material properties. Rays are characterized by the distance from the optical axis, angle off the optical axis, position along optical axis and the optical path length.
-
+Available optical elements include 2-surface thick lenses, 3-surface doublet lenses, and perfect lenses for simulating objectives. Rays are characterized by their distance from the optical axis, angle off the optical axis, position along the optical axis, and optical path length. Convenient helper functions are available for determining focal planes, longitudinal spherical aberration, and plotting results.
 ### Propagation
-Ray tracing in not required to propagate an electric field, it works for any NxN field array. In order to propagate the results from ray tracing, the ray's parameters are converted to an amplitude and phase which is interpolated to an NxN field array.
+Ray tracing and propagation are separate processes. The propagation package requires an NxN electric field array. To propagate the results from ray tracing, the ray's parameters are converted to an amplitude and phase, which are interpolated into an NxN field array.
 
-Common issues with field propagation are: (should include examples)
-1. If the intensity profile is scratchy or has regions of no intensity, this could be a sign of poor sampling, try generating more rays.
-2. If the resulting caustic or phase angle appears spotty and uniform, the propagation grid is not near the focus or the sampling in kspace is wrong.
+Common issues with field propagation:
+1. Scratchy or low-intensity regions: This could indicate poor ray flux sampling. Try increasing the number of initial rays or changing the amplitude binning method.
+2. Spotty or uniform caustic or phase angle: This may occur if the propagation grid is not near the focus or if the sampling in k-space is incorrect. For large aberrations, there may be a significant difference between the midpoint focal plane and the diffraction focal plane. This can cause the propagated region to miss the focal plane area. Try using the diffraction focal plane and increasing the search parameters.
 
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12752313.svg)](https://doi.org/10.5281/zenodo.12752313)
