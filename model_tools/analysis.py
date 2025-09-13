@@ -6,6 +6,7 @@ Steven Sheppard
 """
 # Imports
 import numpy as np
+from numpy.typing import NDArray
 import matplotlib
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -82,7 +83,7 @@ def mean_convolution(data: np.ndarray,
 def fit_quadratic_1d(
     data: NDArray,
     r_idxs: NDArray
-)->Dict:
+)->dict:
     try:
         popt, pcov = curve_fit(
             quadratic,
@@ -1189,7 +1190,7 @@ def plot_light_sheet(results,
 
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(7,3))
-        ax.set(ylabel="r ($\me m$)", xlabel="z (\mu m$")
+        ax.set(ylabel=r"r ($\me m$)", xlabel=r"z (\mu m$")
         show_cbar=True
 
     if ax_title is not None:
@@ -1205,7 +1206,7 @@ def plot_light_sheet(results,
                     )
     # add results to top corner of plot
     ax.text(0.05, 0.95,
-            f"L: {results['length']:.0f}$\mu m$\nW: {results['width']:.1f}$\mu m$",
+            fr"L: {results['length']:.0f}$\mu m$\nW: {results['width']:.1f}$\mu m$",
             color="white",
             fontsize=9,
             ha="left", va="top",
