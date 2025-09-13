@@ -5,6 +5,7 @@ Steven Sheppard
 """
 import model_tools.raytrace as rt
 import numpy as np
+from numpy.typing import NDArray
 from scipy.special import j1 as bessel1
 from scipy.special import j0 as bessel0
 from scipy.integrate import quad
@@ -29,12 +30,12 @@ def fwhm(w: float):
     return fwhm
 
 
-def gaussian_field(r: np.ndarray,
+def gaussian_field(r: NDArray,
                    z: float,
                    wl: float,
                    wo: float,
                    ri: float,
-                   Io: float) -> np.ndarray:
+                   Io: float) -> NDArray:
     '''
     Gaussian Beam defined in Goodman, pg 109
     wz is defined as the FWHM, 1/e.
@@ -63,7 +64,7 @@ def gaussian_field(r: np.ndarray,
     return field
 
 
-def gaussian_intensity(r: np.ndarray,
+def gaussian_intensity(r: NDArray,
                        w: float,
                        Io: float,
                        mu: float,
@@ -84,7 +85,7 @@ def gaussian_intensity(r: np.ndarray,
     return I_r
 
 
-def gaussian_intensity_no_offset(r: np.ndarray,
+def gaussian_intensity_no_offset(r: NDArray,
                                  w: float,
                                  Io: float,
                                  mu: float):
@@ -104,7 +105,7 @@ def gaussian_intensity_no_offset(r: np.ndarray,
     return I_r
 
 
-def gaussian_mixture(r: np.ndarray,
+def gaussian_mixture(r: NDArray,
                      w0: float,
                      I0: float,
                      mu0: float,
@@ -126,7 +127,7 @@ def gaussian_mixture(r: np.ndarray,
     return I
 
 
-def gaussian_mixture_no_bg(r: np.ndarray,
+def gaussian_mixture_no_bg(r: NDArray,
                            w0: float,
                            I0: float,
                            mu0: float,
@@ -195,7 +196,7 @@ def gauss_rayleigh(wl: float,
     return zR
 
 
-def gauss_width(z: np.ndarray,
+def gauss_width(z: NDArray,
                 wl: float,
                 wo: float = None,
                 na: float = None,
@@ -221,7 +222,7 @@ def gauss_width(z: np.ndarray,
     return w_z
 
 
-def gauss_curvature(z: np.ndarray,
+def gauss_curvature(z: NDArray,
                     wl: float,
                     wo: float,
                     ri: float = 1.0):
@@ -258,8 +259,8 @@ def gauss_invwaist(z: float,
     return wo
 
 
-def gauss_matrix_prop(q1: np.ndarray,
-                      abcd: np.ndarray):
+def gauss_matrix_prop(q1: NDArray,
+                      abcd: NDArray):
     '''
     1/q = 1/R - i wl / pi * w
     :param complex q1: Initial Gaussian complex parameter
@@ -274,8 +275,8 @@ def gauss_matrix_prop(q1: np.ndarray,
 # PSF functions
 #------------------------------------------------------------------------------#
 
-def psf_born_wolf(radius_xy: np.ndarray,
-                  z_planes: np.ndarray,
+def psf_born_wolf(radius_xy: NDArray,
+                  z_planes: NDArray,
                   na: float,
                   ri: float,
                   ko: float):
@@ -306,7 +307,7 @@ def psf_born_wolf(radius_xy: np.ndarray,
     return field
 
 
-def airydisk(r: np.ndarray,
+def airydisk(r: NDArray,
              na: float,
              wl: float):
     '''
@@ -352,8 +353,8 @@ def airydisk_value(r: float,
     return airy_disk
 
 
-def airydisk_2d(mask_radius: np.ndarray,
-                x: np.ndarray,
+def airydisk_2d(mask_radius: NDArray,
+                x: NDArray,
                 na: float = 0.5,
                 wl: float = 0.5,
                 sf: int = 2):
@@ -404,7 +405,7 @@ def airy_waist(wl: float = 0.5,
 # Optical path length functions
 #------------------------------------------------------------------------------#
 
-def botcherby_herschel_phase(rho: np.ndarray,
+def botcherby_herschel_phase(rho: NDArray,
                              phi: float,
                              pnt_source_xyz: list = [0,0,0],
                              na: float = 0.5,
@@ -413,7 +414,7 @@ def botcherby_herschel_phase(rho: np.ndarray,
     """
     Calculate the phase in the pupil plane of an objective for a point source.
 
-    :param np.ndarray rho: Pupil radial coordinate
+    :param NDArray rho: Pupil radial coordinate
     :param float phi: Azimuthal angle in pupil and real space
     :param list pnt_source_xyz: Point source coords in image plane.
     :param float na: Objective numerical aperture.
@@ -430,7 +431,7 @@ def botcherby_herschel_phase(rho: np.ndarray,
     return psi
 
 
-def defocused_opl(r: np.ndarray,
+def defocused_opl(r: NDArray,
                   dz: float,
                   ri: float):
     """
@@ -528,3 +529,34 @@ def get_zernike_polynomial(r,
                + z8*(6*r**4 - 6*r**2 + 1))
 
     return zernike
+
+
+#------------------------------------------------------------------------------#
+# Misc. analytic forms
+#------------------------------------------------------------------------------#
+
+def quadratic(
+    r: NDArray,
+    a: float,
+    b: float,
+    c: float    
+) -> NDArray:
+    """_summary_
+
+    Parameters
+    ----------
+    r : NDArray
+        f(x), x to evaluate quadratic
+    a : float
+        squared term
+    b : float
+        linear term
+    c : float
+        constant term
+
+    Returns
+    -------
+    NDArray
+        quadratic function
+    """
+    return a*r**2 + b*r + c

@@ -21,7 +21,8 @@ from dask.diagnostics import ProgressBar
 import model_tools.propagation as pt
 from model_tools.analytic_forms import (gaussian_intensity,
                                         gaussian_mixture,
-                                        gaussian_intensity_no_offset)
+                                        gaussian_intensity_no_offset,
+                                        quadratic)
 
 DEBUG=False
 
@@ -78,6 +79,29 @@ def mean_convolution(data: np.ndarray,
     return convolved[pad_width:-pad_width]
 
 
+def fit_quadratic_1d(
+    data: NDArray,
+    r_idxs: NDArray
+)->Dict:
+    try:
+        popt, pcov = curve_fit(
+            quadratic,
+            r_idxs,
+            data,
+        )
+        fit_pass = True
+        
+    except Exception as e:
+        fit_pass = False
+        popt = [0,0,0]
+        pcov = [0,0,0]
+        print(f'Quadratic fit failed!: \n{e}')
+    
+    return {'fit_params':popt,
+            'fit_keys':['a', 'b', 'c'],
+            'initial_params':None,
+            'fit_pass':fit_pass}
+    
 def fit_gaussian_1d(data: np.ndarray,
                     r_idxs: np.ndarray,
                     offset: bool = False,
