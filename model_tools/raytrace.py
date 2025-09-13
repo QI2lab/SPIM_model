@@ -23,7 +23,9 @@ if not DEBUG:
     import warnings
     warnings.filterwarnings("ignore")
 
-#%% Ray creation
+#------------------------------------------------------------------------------#
+# Ray creation
+#------------------------------------------------------------------------------#
 
 def create_rays(type: str = "gaussian",
                 source: str = "infinity",
@@ -139,9 +141,9 @@ def create_rays(type: str = "gaussian",
 
     return rays
 
-
-#%% Optical classes
-
+#------------------------------------------------------------------------------#
+# Optical classes
+#------------------------------------------------------------------------------#
 
 class Thick_lens:
     """
@@ -228,11 +230,9 @@ class Thick_lens:
         self.na = ri_in * np.sin(np.arctan(self.aperture / self.f1_pp))
         self.pupil_radius = self.na * self.f1_pp * ri_in
 
-
     def params(self):
         params = self.__dict__
         return params
-
 
     def draw(self, ax,
              label: str = "Thick_lens",
@@ -298,7 +298,6 @@ class Thick_lens:
                 ax.axvline(x=self.bfp, ls="--", c=color, label=label+"bfp")
             if np.abs(self.f2) < 200:
                 ax.axvline(x=self.ffp, ls="--", c=color, label=label+"ffp")
-
 
     def raytrace(self, rays):
         """
@@ -436,10 +435,8 @@ class Doublet_lens:
         self.na = ri_in * np.sin(np.arctan(self.aperture / self.f1_pp))
         self.pupil_radius = self.na * self.f1_pp * ri_in
 
-
     def params(self):
         return self.__dict__
-
 
     def draw(self,
              ax,
@@ -519,7 +516,6 @@ class Doublet_lens:
                 ax.axvline(x=self.bfp, ls="--", c=color, label=label+"bfp")
             if np.abs(self.f2) < 1000:
                 ax.axvline(x=self.ffp, ls="--", c=color, label=label+"ffp")
-
 
     def raytrace(self, rays):
         """
@@ -642,10 +638,8 @@ class Perfect_lens:
 
         self.abcd = abcd
 
-
     def params(self):
         return self.__dict__
-
 
     def draw(self,
              ax,
@@ -670,7 +664,6 @@ class Perfect_lens:
                 ax.axvline(x=self.bfp, c="r", ls="--", label=label + "bfp")
             if np.abs(self.f2)<1000:
                 ax.axvline(x=self.ffp, c="r", ls="--", label=label + "ffp")
-
 
     def raytrace(self, rays, final_plane="pp"):
         """
@@ -759,7 +752,6 @@ class Perfect_lens:
 
         return rays
 
-
 def create_etl(z1: float,
                dpt: float,
                d: float,
@@ -827,7 +819,6 @@ def create_etl(z1: float,
 
     return etl
 
-
 def etl_dz_to_dpt(rf_dz,
                   obj_f,
                   relay_mag,
@@ -839,7 +830,6 @@ def etl_dz_to_dpt(rf_dz,
     returns dpt [m^-1]
     """
     return - rf_dz/n_image * (relay_mag/obj_f)**2 * 1e3
-
 
 def etl_dpt_to_dz(dpt,
                   obj_f,
@@ -855,9 +845,9 @@ def etl_dpt_to_dz(dpt,
     rf_dzs = -n_image*dpt*(obj_f/relay_mag)**2 * 1e-3
     return rf_dzs
 
-
-#%% Ratracing functions
-
+#------------------------------------------------------------------------------#
+# Ratracing functions
+#------------------------------------------------------------------------------#
 
 def raytrace_ot(optical_train: list = [],
                 rays: np.ndarray = None,
@@ -1125,7 +1115,6 @@ def raytrace_ot(optical_train: list = [],
                 "fit_rays":fit_rays
                 }
 
-
 def calc_opl(dz: float,
              theta: float,
              ri: float):
@@ -1140,7 +1129,6 @@ def calc_opl(dz: float,
     """
     return  ri * (dz / np.cos(theta))
 
-
 def refract_angle(theta_in:float,
                    ri_in: float,
                    ri_out: float):
@@ -1153,7 +1141,6 @@ def refract_angle(theta_in:float,
     :returns float theta_out: Refracted angle, measured off surface normal
     """
     return np.arcsin(ri_in * np.sin(theta_in) / ri_out)
-
 
 def intersect_plane(rays: np.ndarray,
                     zf: float,
@@ -1202,7 +1189,6 @@ def intersect_plane(rays: np.ndarray,
     rays_new = np.concatenate((rays, rays_new))
 
     return rays_new
-
 
 def intersect_sphere(rays: np.ndarray,
                      surface_param: list,
@@ -1269,7 +1255,6 @@ def intersect_sphere(rays: np.ndarray,
 
     return new_rays
 
-
 def intersect_optical_axis(rays: np.ndarray,
                            ri: float = 1.0):
     """
@@ -1303,7 +1288,6 @@ def intersect_optical_axis(rays: np.ndarray,
     nan_mask = np.isnan(rays[-1, :, 2])
     new_rays[-1, nan_mask, :] = np.nan
     return new_rays
-
 
 def intersect_rays(rays: np.ndarray,
                    ri: float = 1.0):
@@ -1344,7 +1328,6 @@ def intersect_rays(rays: np.ndarray,
     new_rays = np.concatenate((rays, rays_new))
 
     return new_rays
-
 
 def ray_focal_plane(rays: np.ndarray,
                     ri: float = 1.0,
@@ -1418,7 +1401,6 @@ def ray_focal_plane(rays: np.ndarray,
         else:
             return [paraxial_focus, midpoint_focus, marginal_focus]
 
-
 def ot_focal_plane(ot: list,
                    rays: np.ndarray = None,
                    aperture_radius: float=1.0,
@@ -1451,7 +1433,6 @@ def ot_focal_plane(ot: list,
                                         method=method)
     return focal_planes
 
-
 def rays_to_field_plane(rays: np.ndarray,
                         x_max: float,
                         padding: float = 0.050):
@@ -1472,7 +1453,6 @@ def rays_to_field_plane(rays: np.ndarray,
 
     return zf
 
-
 def get_ray_oa_intersects(rays: np.ndarray):
     """
     Given a 'rays' array, find the number of optical axis intersections.
@@ -1491,8 +1471,9 @@ def get_ray_oa_intersects(rays: np.ndarray):
     return crossings
 
 
-#%% wavefront analysis
-
+#------------------------------------------------------------------------------#
+# wavefront analysis
+#------------------------------------------------------------------------------#
 
 def get_ray_wf(rays: np.ndarray,
                pupil_radius: float = None,
@@ -1526,7 +1507,6 @@ def get_ray_wf(rays: np.ndarray,
 
     return rho, wf
 
-
 def ray_opl_polynomial(rays: np.ndarray,
                        pupil_radius: float = None,
                        method: str = "opld"):
@@ -1555,7 +1535,6 @@ def ray_opl_polynomial(rays: np.ndarray,
 
     return fit_params
 
-
 def opl_polynomial(r: np.ndarray,
                    coefficients):
     """
@@ -1570,7 +1549,6 @@ def opl_polynomial(r: np.ndarray,
         wf += r**n * c
 
     return wf
-
 
 def ray_opl_strehl(pupil_rays: np.ndarray,
                    wl: float,
@@ -1645,7 +1623,6 @@ def ray_opl_strehl(pupil_rays: np.ndarray,
 
     return strehl
 
-
 def ray_opl_rms(pupil_rays: np.ndarray,
                 pupil_radius: float,
                 wl: float = 0.000561,
@@ -1683,7 +1660,6 @@ def ray_opl_rms(pupil_rays: np.ndarray,
 
     return rms
 
-
 def ot_opl_rms(optical_train: list,
                rays: np.ndarray):
     """
@@ -1713,7 +1689,6 @@ def ot_opl_rms(optical_train: list,
                                   units="mm")
 
     return focal_plane_rms
-
 
 def ray_opl_analysis(pupil_rays: np.ndarray,
                      pupil_radius: float,
@@ -1750,7 +1725,6 @@ def ray_opl_analysis(pupil_rays: np.ndarray,
 
     return results_dict
 
-
 def get_zernike_from_fit(fit):
     """
     Convert the polynomial fit coefficients to the zernike mode coeffiecients.
@@ -1766,8 +1740,10 @@ ul
     z0 = fit[0] + z3 - z8 + z15 - z24
     return [z0, z3, z8, z15, z24]
 
+#------------------------------------------------------------------------------#
+# Rays to field
+#------------------------------------------------------------------------------#
 
-#%% Rays to field
 def rays_to_field(mask_radius: np.ndarray,
                   rays: np.ndarray,
                   ko: float,
@@ -1910,7 +1886,7 @@ def rays_to_field(mask_radius: np.ndarray,
 
         # Plot amplitude histogram
         ax = fig.add_subplot(grid[0, 0])
-        ax.set_title("$\phi(r)$", fontsize=title_size)
+        ax.set_title(r"$\phi(r)$", fontsize=title_size)
         ax.set_ylabel(r"# of rays", fontsize=label_size, labelpad=label_pad)
         ax.plot(bin_centers, ray_density, ".m", ms=1, c="r", rasterized=True)
         ax.tick_params(axis="both", pad=5,
@@ -1918,7 +1894,7 @@ def rays_to_field(mask_radius: np.ndarray,
 
         # Plot amplitude
         ax = fig.add_subplot(grid[0, 2])
-        ax.set_title("$\phi_{int}(r)$", fontsize=title_size)
+        ax.set_title(r"$\phi_{int}(r)$", fontsize=title_size)
         ax.plot(radius, flux_interp(radius), ".m", ms=1, rasterized=True)
         ax.tick_params(axis="both", labelsize=ticklbl_size,
                        labelbottom=False, labelleft=False)
@@ -1952,7 +1928,7 @@ def rays_to_field(mask_radius: np.ndarray,
 
         # Plot opl
         ax = fig.add_subplot(grid[1, 0])
-        t_str = "$\Delta OPL(r)$"
+        t_str = r"$\Delta OPL(r)$"
         ax.set_title(t_str, fontsize=title_size)
         ax.set_ylabel(r"OPL (mm)",fontsize=label_size, labelpad=label_pad)
         ax.set_xlabel(r"Radius (mm)", fontsize=label_size, labelpad=label_pad)
@@ -1963,7 +1939,7 @@ def rays_to_field(mask_radius: np.ndarray,
 
         # Plot phase
         ax = fig.add_subplot(grid[1, 2])
-        t_str = "$\Delta OPL_{int}(r)$"
+        t_str = r"$\Delta OPL_{int}(r)$"
         ax.set_title(t_str, fontsize=title_size)
         ax.set_xlabel(r"Radius (mm)", fontsize=label_size, labelpad=label_pad)
         ax.plot(radius[::5], phase_interp(radius[::5]), ".m", ms=1)
@@ -1973,7 +1949,7 @@ def rays_to_field(mask_radius: np.ndarray,
         # Plot 2d phase
         abs_max = np.max(np.abs(phase))
         ax = fig.add_subplot(grid[1, 4], sharex=ax_i, sharey=ax_i)
-        ax.set_title("$\Phi(r)$", fontsize=title_size)
+        ax.set_title(r"$\Phi(r)$", fontsize=title_size)
         ax.set_xlabel(r"x (mm)", fontsize=label_size, labelpad=label_pad)
         ax.set_ylabel(r"y (mm)", fontsize=label_size, labelpad=label_pad)
         ax.yaxis.set_major_locator(MaxNLocator(3))
@@ -2010,7 +1986,6 @@ def rays_to_field(mask_radius: np.ndarray,
         return phase
     elif results=="amplitude":
         return amp
-
 
 def raytrace_to_field(results: dict,
                       grid_params: list,
@@ -2094,8 +2069,9 @@ def raytrace_to_field(results: dict,
 
     return [initial_field, rays_to_field_z]
 
-
-#%% Matrix Raytracing
+#------------------------------------------------------------------------------#
+# Matrix Raytracing
+#------------------------------------------------------------------------------#
 # ABCD matrices follow (r, n theta) formulation
 
 def abcd_freespace(d: float,
@@ -2112,7 +2088,6 @@ def abcd_freespace(d: float,
         return np.array([[1, d/n],
                          [0, 1]])
 
-
 def abcd_thinlens(f: float,
                   symbolic: bool = False):
     """
@@ -2127,7 +2102,6 @@ def abcd_thinlens(f: float,
         return np.array([[1, 0],
                          [-1/f, 1]])
 
-
 def abcd_refract_plano(symbolic: bool = False):
     """
     :param None:
@@ -2138,7 +2112,6 @@ def abcd_refract_plano(symbolic: bool = False):
     else:
         return np.array([[1, 0],
                          [0, 1]])
-
 
 def abcd_refract_spher(R: float,
                        n1: float,
@@ -2158,7 +2131,6 @@ def abcd_refract_spher(R: float,
         return np.array([[1, 0],
                          [-(n2 - n1) / R, 1]])
 
-
 def abcd_ft(f: float,
             symbolic: bool = False):
     """
@@ -2174,7 +2146,6 @@ def abcd_ft(f: float,
         return np.array([[0, f],
                          [1/f, 0]])
 
-
 def abcd_relay(symbolic: bool = False):
     """
     Flips angle and radius
@@ -2187,7 +2158,6 @@ def abcd_relay(symbolic: bool = False):
     else:
         return np.array([[-1, 0],
                          [0, -1]])
-
 
 def abcd_cardinal_points(optical_train: list,
                          n1: float,
@@ -2220,7 +2190,6 @@ def abcd_cardinal_points(optical_train: list,
     f2_pp = -1 / c
 
     return [f1, f2, h1, h2, f1_pp, f2_pp]
-
 
 def abcd_focal_plane(optical_train: list,
                      return_df: bool = False):
@@ -2262,9 +2231,9 @@ def abcd_focal_plane(optical_train: list,
     else:
         return focal_plane
 
-
 #-----------------------------------------------------------------------------#
-# %%Plotting functions
+# Plotting functions
+#------------------------------------------------------------------------------#
 
 # create custom colormap
 cdict = {
@@ -2283,7 +2252,6 @@ cdict = {
 
 black_centered_cmap = LinearSegmentedColormap('BlackCentered',
                                               segmentdata=cdict)
-
 
 def plot_rays(rays: np.ndarray,
               n_rays_to_plot: int=31,
@@ -2382,7 +2350,6 @@ def plot_rays(rays: np.ndarray,
         else:
             plt.close(fig)
 
-
 def plot_optical_train(optical_trains: list = [],
                        axes_titles: list[str] = [],
                        rays: list[np.ndarray] = [],
@@ -2450,7 +2417,6 @@ def plot_optical_train(optical_trains: list = [],
 
     return fig
 
-
 def plot_opld(rays: list = [],
               rays_labels: list  = [],
               axes_title: str = "Optical length difference",
@@ -2501,7 +2467,6 @@ def plot_opld(rays: list = [],
     if showfig:
         fig.show()
     else: plt.close(fig)
-
 
 def plot_ot_aberration(optical_trains: list,
                        fig_title: str="Aberrations",
@@ -2584,7 +2549,6 @@ def plot_ot_aberration(optical_trains: list,
         plt.show()
     else: plt.close(fig)
 
-
 def plot_radial_distribution(rays: np.ndarray,
                              binning: str = "doane",
                              title: str = "Ray Distribution",
@@ -2623,7 +2587,6 @@ def plot_radial_distribution(rays: np.ndarray,
     if showfig:
         plt.show()
     else: plt.close(fig)
-
 
 def plot_fit_summary(fit: np.ndarray,
                      fig_title: str="Fit Results",
@@ -2727,9 +2690,9 @@ def plot_fit_summary(fit: np.ndarray,
         fig.show()
     else: plt.close(fig)
 
-
 #-----------------------------------------------------------------------------#
-#%% misc. helpful functions
+# misc. helpful functions
+#------------------------------------------------------------------------------#
 
 def get_unique_dir(parent_dir: Path,
                    dir_name: str):

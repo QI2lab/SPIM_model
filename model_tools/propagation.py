@@ -41,6 +41,7 @@ except ImportError:
 
 #------------------------------------------------------------------------------#
 # Propagation
+#------------------------------------------------------------------------------#
 
 def propagate(Ek: np.ndarray,
               dz: float,
@@ -101,6 +102,7 @@ def propagate(Ek: np.ndarray,
 
 #------------------------------------------------------------------------------#
 # Create field arrays
+#------------------------------------------------------------------------------#
 
 def field_grid(num_xy: int = 1001,
                num_zx: int = 100,
@@ -201,6 +203,7 @@ def grid_phase_mask(Er: np.ndarray,
 
 #------------------------------------------------------------------------------#
 # helper functions for propagation and electric fields/intensity
+#------------------------------------------------------------------------------#
 
 def get_3d_field(initial_field: np.ndarray,
                  z: np.ndarray,
@@ -696,7 +699,9 @@ def get_light_sheet(field: np.ndarray,
         joint_intensity[z_idx] = np.sqrt(f_intensity_interp(eval_radius))*np.sqrt(intensity_s_xy)
     return joint_intensity
 
-#------------------------------------------------------------------------------## Plotting functions
+#------------------------------------------------------------------------------#
+# Plotting functions
+#------------------------------------------------------------------------------#
 
 def plot_field(fields: list = [],
                field_labels: list = [],
