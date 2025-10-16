@@ -18,7 +18,6 @@ Plotting functions:
 Steven Sheppard
 '''
 import model_tools.raytrace as rt
-from model_tools.analytic_forms import gaussian_intensity_no_offset
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import PowerNorm
@@ -651,6 +650,9 @@ def get_light_sheet(field: np.ndarray,
                     x: np.ndarray,
                     x_max: float = None,
                     wo: float = 10.00):
+    # import analytic gaussian for tall axis of light sheet
+    from model_tools.analytic_forms import gaussian_intensity_no_offset
+
     n_zx = field.shape[0]
     n_xy = field.shape[1]
     dx = x[1] - x[0]
