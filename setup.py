@@ -28,7 +28,7 @@ setup(
       description="Python package for simulating SPIM excitation light sheet",
       long_description=long_description,
       author='qi2lab, Steven J Sheppard, Peter Brown',
-      packages=find_packages(include=['src']),
+      packages=find_packages(include=['model_tools']),
       python_requires='>=3.10',
       install_requires=required_pkgs
       )
