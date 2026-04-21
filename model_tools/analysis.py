@@ -232,9 +232,11 @@ def fit_1d_gaussian_zstack(data: np.ndarray,
                  for z_idx in z_idxs]
         r = dask.compute(*tasks)
 
-    results= {'z_idxs':z_idxs,
-                   'r_idxs':r_idxs,
-                   'fit_results':np.stack(r, axis=0)}
+    results= {
+        'z_idxs':z_idxs,
+        'r_idxs':r_idxs,
+        'fit_results':np.stack(r, axis=0)
+    }
 
     if DEBUG_fits:
         # Plots in idx units
@@ -263,12 +265,20 @@ def plot_fit_zstack(results: np.ndarray,
     :param Path savedir: Optionally save figure by passing Path to dir.
     :param str label: If saving, used to make file name.
     """
-    n_fits = len(results['fit_results'][0]['fit_params'])
+    try:
+        n_fits = len(results['fit_results'][0]['fit_params'])
+        fit_key = "fit_params"
+    except Exception:
+        n_fits = len(results['fit_results'][0]['multi_fit_params'])
+        fit_key = "multi_fit_params"
+        
     # Show distribution of fit parameters
     fig = plt.figure(figsize=(n_fits*12, 8))
-    grid = fig.add_gridspec(nrows=1,
-                            ncols=n_fits,
-                            wspace=0.3)
+    grid = fig.add_gridspec(
+        nrows=1,
+        ncols=n_fits,
+        wspace=0.3
+    )
     fig.suptitle('Z-stack fit summary')
 
     for ii in range(n_fits):
@@ -277,15 +287,15 @@ def plot_fit_zstack(results: np.ndarray,
         ax.set_xlabel(f"z (dz={dz})")
 
         z_vals = results['z_idxs']*dz
-        fits = np.abs([fit['fit_params'][ii]
-                       for fit in results['fit_results']])*dx
+        fits = np.abs([fit[fit_key][ii]
+                       for fit in results['fit_results']])*dx 
         fit_mins = np.min(np.abs(
-                [f['fit_params'][ii] for f in results['fit_results']]
+                [f[fit_key][ii] for f in results['fit_results']]
                 )*dx)
 
         if ii==0:
             min_radius = np.min(np.abs(
-                [f['fit_params'][ii] for f in results['fit_results']]
+                [f[fit_key][ii] for f in results['fit_results']]
                 )*dx)
             ax.set_ylabel(f"x (dx={dx})")
             ax.plot(z_vals, fits, '.', label='Fits')
@@ -313,6 +323,7 @@ def fit_gaussianmixture_1d(data: np.ndarray,
                            r_idxs: np.ndarray,
                            peak_distance: int = 15,
                            peak_widths: list[int, int] = [1,100],
+                           peak_prominence: float = 0.04,
                            plot_fit_results: bool = False,
                            savedir: Path = None,
                            showfig: bool = False,
@@ -349,14 +360,15 @@ def fit_gaussianmixture_1d(data: np.ndarray,
 
     #-------------------------------------------------------------------------#
     # find peaks in data
-    peak_idxs, peaks = find_peaks(data,
-                                  height=[bg_guess+0.020, np.inf],
-                                  distance=peak_distance,
-                                  width=peak_widths,
-                                  prominence=0.040,
-                                  wlen=150,
-                                  rel_height=1 - 1/np.e**2
-                                  )
+    peak_idxs, peaks = find_peaks(
+        data,
+        height=[bg_guess+0.020, np.inf],
+        distance=peak_distance,
+        width=peak_widths,
+        prominence=peak_prominence,
+        wlen=150,
+        rel_height=1 - 1/np.e**2
+    )
 
     if len(peak_idxs) == 0:
         # Use data moments for an initial guess
@@ -431,7 +443,7 @@ def fit_gaussianmixture_1d(data: np.ndarray,
                                data,
                                p0=fit_ip,
                                bounds=bounds,
-                               maxfev=7500)
+                               maxfev=10000)
         fit_pass = True
         fail_code = ""
 
@@ -501,6 +513,8 @@ def fit_gaussianmixture_1d(data: np.ndarray,
 
 def fit_gaussianmixture_zstack(data: np.ndarray,
                                peak_distance: int=10,
+                               peak_prominence: float=0.04,
+                               peak_widths: list[int, int] = [1,100],
                                plot_zstack_summary: bool=False,
                                plot_fit_results: bool=False,
                                savedir: Path=None,
@@ -531,6 +545,8 @@ def fit_gaussianmixture_zstack(data: np.ndarray,
             data=data[z_idx],
             r_idxs=r_idxs,
             peak_distance=peak_distance,
+            peak_widths=peak_widths,
+            peak_prominence=peak_prominence,
             plot_fit_results=plot_fit_results,
             savedir=savedir,
             showfig=False,
@@ -543,10 +559,11 @@ def fit_gaussianmixture_zstack(data: np.ndarray,
               'r_idxs':r_idxs,
               'fit_results':np.stack(r, axis=0)}
 
-    # Change backend back to interactive
-    matplotlib.use('QtAgg')
-
     if plot_zstack_summary:
+        if showfig:
+            # Change backend back to interactive
+            matplotlib.use('QtAgg')
+            
         # Plots in idx units
         plot_fit_zstack(results,
                          dz=1.0,
